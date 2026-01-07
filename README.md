@@ -15,27 +15,6 @@ A high-performance, lock-free limit order book implementation with dual implemen
 
 The system demonstrates advanced concurrent programming concepts through lock-free data structures, comparing the performance characteristics of Rust's memory safety guarantees with C++'s manual memory management approach.
 
-## Project Structure
-
-```
-lock-free-order-book/
-├── rust/                    # Rust implementation
-│   ├── src/
-│   │   ├── order_book.rs    # Core order book logic
-│   │   ├── market_simulator.rs # Market data simulation
-│   │   └── websocket_server.rs # WebSocket API server
-│   └── benches/             # Performance benchmarks
-├── cpp/                     # C++ implementation
-│   ├── src/                 # Core C++ order book
-│   └── benches/             # C++ benchmarks
-├── web-dashboard/           # Real-time web dashboard
-│   ├── public/              # Frontend assets
-│   ├── server.js            # Node.js WebSocket server
-│   └── package.json         # Dependencies
-├── data/                    # Sample trading data
-└── scripts/                 # Automation scripts
-```
-
 ## Quick Start
 
 ### Web Dashboard
@@ -47,23 +26,6 @@ npm start
 ```
 
 Visit http://localhost:3000 to access the dashboard.
-
-### Deployment
-
-The web dashboard can be deployed to various platforms:
-
-**Railway:**
-1. Fork this repository
-2. Connect to Railway.app
-3. Deploy the web-dashboard directory
-
-**Heroku:**
-```bash
-cd web-dashboard
-git init && git add . && git commit -m "Deploy"
-heroku create your-app-name
-git push heroku main
-```
 
 ### Rust Implementation
 
@@ -109,17 +71,17 @@ The web dashboard provides real-time visualization of:
 ### Architecture Overview
 
 ```
-┌─────────────────┐    WebSocket     ┌──────────────────┐
-│   Web Dashboard │ ◄──────────────► │  Market Simulator │
-│   (JavaScript)  │                  │   (Node.js/Rust) │
-└─────────────────┘                  └──────────────────┘
+┌────────────────┐    WebSocket     ┌────────────────────┐
+│  Web Dashboard │ ◄──────────────► │  Market Simulator  │
+│  (JavaScript)  │                  │   (Node.js/Rust)   │
+└────────────────┘                  └────────────────────┘
                                                │
                                                ▼
-                                     ┌──────────────────┐
-                                     │ Lock-Free Order  │
-                                     │      Book        │
-                                     │   (Rust/C++)     │
-                                     └──────────────────┘
+                                     ┌───────────────────┐
+                                     │  Lock-Free Order  │
+                                     │       Book        │
+                                     │    (Rust/C++)     │
+                                     └───────────────────┘
 ```
 
 ## Performance Benchmarks
@@ -181,26 +143,6 @@ Multi-threaded performance using lock-free queues and concurrent order processin
 - Easier integration with existing trading infrastructure
 
 Both implementations maintain O(log n) complexity for price-time priority operations while demonstrating the trade-offs between memory safety and raw performance.
-
-## Use Cases
-
-- **Trading System Development**: Foundation for high-frequency trading platforms
-- **Algorithm Research**: Backtest trading strategies with realistic market simulation  
-- **Performance Analysis**: Compare lock-free vs traditional concurrent approaches
-- **Educational Platform**: Learn lock-free programming and market microstructure
-- **Portfolio Demonstration**: Showcase advanced systems programming skills
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/new-feature`)
-3. Commit your changes (`git commit -m 'Add new feature'`)
-4. Push to the branch (`git push origin feature/new-feature`)
-5. Open a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Technical Implementation
 
