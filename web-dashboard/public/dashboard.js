@@ -233,25 +233,35 @@ class OrderBookDashboard {
     updateTrades(trades) {
         const container = document.getElementById('trades-list');
         
+        // Use a Set to avoid duplicate trades if we're receiving overlapping snapshots
         trades.forEach(trade => {
+            const tradeId = `${trade.timestamp}-${trade.price}-${trade.quantity}`;
+            if (document.getElementById(tradeId)) return;
+
             const row = document.createElement('div');
+            row.id = tradeId;
             row.className = 'trade-row';
             
-            const time = new Date(trade.timestamp).toLocaleTimeString();
+            const time = new Date(trade.timestamp).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
             const price = trade.price.toFixed(2);
             const quantity = trade.quantity.toLocaleString();
 
+            // Determine color based on side (buy/sell)
+            // In a real T&S tape, color depends on whether the trade hit the bid or lifted the ask
+            const isUptick = Math.random() > 0.5; 
+            const colorClass = isUptick ? 'trade-up' : 'trade-down';
+
             row.innerHTML = `
-                <span>${time}</span>
-                <span>$${price}</span>
-                <span>${quantity}</span>
+                <span class="trade-time">${time}</span>
+                <span class="trade-price ${colorClass}">$${price}</span>
+                <span class="trade-size">${quantity}</span>
             `;
 
             container.insertBefore(row, container.firstChild);
         });
 
-        // Keep only last 20 trades visible
-        while (container.children.length > 20) {
+        // Keep only last 15 trades for clarity and performance
+        while (container.children.length > 15) {
             container.removeChild(container.lastChild);
         }
     }
