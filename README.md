@@ -13,20 +13,16 @@ This project was built to empirically evaluate the performance, safety, and late
 
 ---
 
-## 🚀 Live Demo & Deployment
+## Live Deployment
 This application is fully containerized and production-ready. 
 
 **Live Demo:** [https://lock-free-order-book.onrender.com](https://lock-free-order-book.onrender.com)
 
 **No login is required to view the dashboard!** If you run this locally, please ensure that port `3000` is free (or change the `PORT` env variable) to avoid conflicts with other local services like Open WebUI.
 
-### Deploying to Render / Railway
-This repository contains a `Dockerfile` and `railway.json` that automatically provisions an Ubuntu image, installs `g++`, `cmake`, `cargo`, and `nodejs`, builds both native binaries, and exposes the web dashboard.
-Simply connect this repository to your preferred PaaS to deploy.
-
 ---
 
-## 💻 Running Locally
+## Running Locally
 
 ### Prerequisites
 - Node.js (v20+)
@@ -58,7 +54,7 @@ Visit `http://localhost:3000` to watch the engines battle it out!
 
 ---
 
-## 📊 Formal Benchmarks
+## Formal Benchmarks
 Both engines include rigorous standard benchmarks using `Google Benchmark` for C++ and `Criterion` for Rust. 
 
 ### Rust (`cargo bench`)
@@ -84,7 +80,7 @@ Both engines include rigorous standard benchmarks using `Google Benchmark` for C
 
 ---
 
-## 🏗️ Architecture Deep-Dive
+## Architecture Deep-Dive
 
 ```text
 ┌────────────────┐    WebSocket     ┌────────────────────┐
@@ -108,4 +104,4 @@ Both engines include rigorous standard benchmarks using `Google Benchmark` for C
   - `std::erase_if` to natively simplify the erase-remove idiom on Standard Library containers like `std::deque`.
 
 ---
-*Built as a demonstrative tool for Systems Engineering and HFT.*
+*Built as a demonstrative tool for high-frequency trading*
