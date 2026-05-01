@@ -2,7 +2,7 @@
 
 A high-performance, **lock-free limit order book** with dual engines implemented in **Rust** and **C++**. It features a **Node.js** orchestrator and a real-time web dashboard that streams live, identical market data to both engines, allowing for a **true side-by-side performance comparison** of Rust vs. C++.
 
-## 🌟 The Project
+## The Project
 This project was built to empirically evaluate the performance, safety, and latency characteristics of Rust against C++ in an ultra-low latency, concurrent environment.
 
 **Unlike typical benchmarks, this project runs both engines simultaneously on the same hardware.**
