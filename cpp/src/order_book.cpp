@@ -23,10 +23,7 @@ std::vector<Trade> OrderBook::match_order(Order& order) {
                 maker_order.quantity -= trade_quantity;
                 price_level.total_quantity -= trade_quantity;
             }
-            price_level.orders.erase(
-                std::remove_if(price_level.orders.begin(), price_level.orders.end(),
-                               [](const Order& o) { return o.quantity == 0; }),
-                price_level.orders.end());
+            std::erase_if(price_level.orders, [](const Order& o) { return o.quantity == 0; });
             
             if (price_level.orders.empty()) {
                 it = asks.erase(it);
@@ -51,10 +48,7 @@ std::vector<Trade> OrderBook::match_order(Order& order) {
                 maker_order.quantity -= trade_quantity;
                 price_level.total_quantity -= trade_quantity;
             }
-            price_level.orders.erase(
-                std::remove_if(price_level.orders.begin(), price_level.orders.end(),
-                               [](const Order& o) { return o.quantity == 0; }),
-                price_level.orders.end());
+            std::erase_if(price_level.orders, [](const Order& o) { return o.quantity == 0; });
 
             if (price_level.orders.empty()) {
                 it = bids.erase(it);
@@ -98,8 +92,8 @@ bool OrderBook::cancel_order(uint64_t order_id, Side side, double price) {
         }
         auto& price_level = it->second;
         auto& orders = price_level.orders;
-        auto order_it = std::find_if(orders.begin(), orders.end(), 
-                                     [order_id](const Order& o) { return o.order_id == order_id; });
+        auto order_it = std::ranges::find_if(orders, 
+                                             [order_id](const Order& o) { return o.order_id == order_id; });
 
         if (order_it != orders.end()) {
             price_level.total_quantity -= order_it->quantity;
@@ -116,8 +110,8 @@ bool OrderBook::cancel_order(uint64_t order_id, Side side, double price) {
         }
         auto& price_level = it->second;
         auto& orders = price_level.orders;
-        auto order_it = std::find_if(orders.begin(), orders.end(), 
-                                     [order_id](const Order& o) { return o.order_id == order_id; });
+        auto order_it = std::ranges::find_if(orders, 
+                                             [order_id](const Order& o) { return o.order_id == order_id; });
 
         if (order_it != orders.end()) {
             price_level.total_quantity -= order_it->quantity;
@@ -139,26 +133,24 @@ bool OrderBook::modify_order(uint64_t order_id, Side side, double price, uint64_
         auto it = bids.find(price);
         if (it != bids.end()) {
             auto& price_level = it->second;
-            for (auto& order : price_level.orders) {
-                if (order.order_id == order_id) {
-                    price_level.total_quantity -= order.quantity;
-                    order.quantity = new_quantity;
-                    price_level.total_quantity += new_quantity;
-                    return true;
-                }
+            auto order_it = std::ranges::find_if(price_level.orders, [order_id](const Order& o) { return o.order_id == order_id; });
+            if (order_it != price_level.orders.end()) {
+                price_level.total_quantity -= order_it->quantity;
+                order_it->quantity = new_quantity;
+                price_level.total_quantity += new_quantity;
+                return true;
             }
         }
     } else {
         auto it = asks.find(price);
         if (it != asks.end()) {
             auto& price_level = it->second;
-            for (auto& order : price_level.orders) {
-                if (order.order_id == order_id) {
-                    price_level.total_quantity -= order.quantity;
-                    order.quantity = new_quantity;
-                    price_level.total_quantity += new_quantity;
-                    return true;
-                }
+            auto order_it = std::ranges::find_if(price_level.orders, [order_id](const Order& o) { return o.order_id == order_id; });
+            if (order_it != price_level.orders.end()) {
+                price_level.total_quantity -= order_it->quantity;
+                order_it->quantity = new_quantity;
+                price_level.total_quantity += new_quantity;
+                return true;
             }
         }
     }

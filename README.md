@@ -100,7 +100,10 @@ Both engines include rigorous standard benchmarks using `Google Benchmark` for C
 
 ### Safety vs Speed
 - **Rust**: Proves that zero-cost abstractions and memory safety (borrow checker) do not compromise high-frequency trading speeds. In fact, Rust's standard library and `BTreeMap` handle large match cycles incredibly efficiently.
-- **C++**: Highlights the raw control and ecosystem maturity, using `std::map` and custom manual memory allocations, optimized with `-O3` and C++23 standards.
+- **C++20/23**: Highlights the raw control and ecosystem maturity, using `std::map` and custom manual memory allocations, optimized with `-O3`. It leverages modern **C++20/23 features** such as:
+  - `<compare>` (spaceship operator `<=>`) for defaulted and extremely fast zero-cost struct comparisons.
+  - `<ranges>` (`std::ranges::find_if`) for cleaner and more composable algorithmic pipelines.
+  - `std::erase_if` to natively simplify the erase-remove idiom on Standard Library containers like `std::deque`.
 
 ---
 *Built as a demonstrative tool for Systems Engineering and HFT.*

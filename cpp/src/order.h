@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <iostream>
+#include <compare>
 
 enum class Side {
     Buy,
@@ -19,6 +20,8 @@ struct Order {
 
     Order(uint64_t id, Side s, double p, uint64_t qty)
         : order_id(id), side(s), price(p), quantity(qty), timestamp(0) {}
+
+    auto operator<=>(const Order&) const = default;
 };
 
 std::ostream& operator<<(std::ostream& os, const Order& order);
