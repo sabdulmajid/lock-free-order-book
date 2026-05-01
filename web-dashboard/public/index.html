@@ -11,174 +11,46 @@
   <body>
     <div class="dashboard">
       <header class="header">
-        <h1>Magnificent 7 Order Book</h1>
+        <h1>Lock-Free Order Book</h1>
         <div class="header-info">
           <div class="stock-selector">
             <select id="stock-selector" class="stock-dropdown">
-              <option value="AAPL">Apple Inc.</option>
-              <option value="GOOGL">Alphabet Inc.</option>
-              <option value="AMZN">Amazon.com Inc.</option>
-              <option value="META">Meta Platforms Inc.</option>
-              <option value="MSFT">Microsoft Corporation</option>
-              <option value="NVDA">NVIDIA Corporation</option>
-              <option value="TSLA">Tesla Inc.</option>
+              <option value="AAPL">AAPL</option>
+              <option value="GOOGL">GOOGL</option>
+              <option value="AMZN">AMZN</option>
+              <option value="META">META</option>
+              <option value="MSFT">MSFT</option>
+              <option value="NVDA">NVDA</option>
+              <option value="TSLA">TSLA</option>
             </select>
             <div class="current-price">
-              <span class="price-label">Current Price</span>
-              <span class="price-value" id="current-price">$150.00</span>
+              <span class="price-label">LAST</span>
+              <span class="price-value" id="current-price">$0.00</span>
             </div>
           </div>
           <div class="status-indicators">
             <div class="status-item">
               <span class="status-dot connected" id="connection-status"></span>
-              <span>Live Data</span>
-            </div>
-            <div class="language-toggle">
-              <button class="lang-btn active" id="rust-btn" data-lang="rust">Rust</button>
-              <button class="lang-btn" id="cpp-btn" data-lang="cpp">C++</button>
+              <span>LIVE</span>
             </div>
           </div>
         </div>
       </header>
 
-      <!-- Performance Comparison Banner -->
       <div class="comparison-banner">
         <div class="comparison-content">
-          <h3>Rust vs C++ Performance Comparison</h3>
+          <h3>Dual-Engine Performance Comparison</h3>
           <p>
-            Watch our <strong>lock-free order book</strong> implementations
-            compete in real-time! Both process the same Magnificent 7 stock
-            data, but which language handles high-frequency trading better? See
-            live performance metrics below.
+            Real-time benchmarking of C++20 and Rust implementations processing identical order flow through lock-free data structures.
           </p>
           <div class="battle-stats">
             <div class="stat-item">
-              <span class="stat-label">Current Winner</span>
-              <span class="stat-value" id="performance-winner">Rust</span>
+              <span class="stat-label">DOMINANT ENGINE</span>
+              <span class="stat-value" id="performance-winner">-</span>
             </div>
             <div class="stat-item">
-              <span class="stat-label">Speed Difference</span>
-              <span class="stat-value" id="speed-difference">+23% faster</span>
-            </div>
-          </div>
-          <button class="learn-more-btn" onclick="toggleEducation()">View Detailed Analysis</button>
-        </div>
-      </div>
-
-      <div
-        class="education-details"
-        id="education-details"
-        style="display: none"
-      >
-        <div class="education-grid">
-          <div class="education-card">
-            <h4>Order Book Basics</h4>
-            <p>
-              <strong>Bids (Cyan):</strong> People wanting to BUY at specific
-              prices<br />
-              <strong>Asks (Red):</strong> People wanting to SELL at specific
-              prices<br />
-              <strong>Spread:</strong> The gap between highest bid and lowest
-              ask
-            </p>
-          </div>
-          <div class="education-card">
-            <h4>Lock-Free Technology</h4>
-            <p>
-              Traditional systems use "locks" that slow things down. Our
-              lock-free system lets multiple operations happen simultaneously
-              without waiting, making it incredibly fast - perfect for
-              high-frequency trading!
-            </p>
-          </div>
-          <div class="education-card">
-            <h4>The Magnificent 7</h4>
-            <p>
-              We're tracking the 7 most valuable tech companies: Apple, Google,
-              Amazon, Meta, Microsoft, Nvidia, and Tesla. These stocks represent
-              over $10 trillion in market value!
-            </p>
-          </div>
-          <div class="education-card">
-            <h4>Rust vs C++ Comparison</h4>
-            <p>
-              <strong>Rust:</strong> Memory-safe, prevents crashes, excellent
-              for concurrent programming<br />
-              <strong>C++:</strong> Maximum control, decades of optimization,
-              used in most trading systems<br />
-              <strong>Winner:</strong> Depends on the task - watch the live
-              metrics!
-            </p>
-          </div>
-        </div>
-
-        <!-- Detailed Performance Analysis -->
-        <div class="analysis-section">
-          <h3>Live Performance Analysis</h3>
-          <div class="analysis-grid">
-            <div class="analysis-card rust-analysis">
-              <h4>Rust Advantages</h4>
-              <ul>
-                <li>
-                  <strong>Memory Safety:</strong> No crashes from memory bugs
-                </li>
-                <li>
-                  <strong>Concurrency:</strong> Excellent at handling multiple
-                  threads
-                </li>
-                <li>
-                  <strong>Zero-Cost Abstractions:</strong> High-level code,
-                  low-level performance
-                </li>
-                <li>
-                  <strong>Modern Design:</strong> Built for today's multi-core
-                  systems
-                </li>
-              </ul>
-              <div class="performance-summary">
-                <span class="summary-label">Typical Performance:</span>
-                <span class="summary-value">45,000+ orders/sec</span>
-              </div>
-            </div>
-
-            <div class="analysis-card cpp-analysis">
-              <h4>C++ Advantages</h4>
-              <ul>
-                <li><strong>Raw Speed:</strong> Direct hardware control</li>
-                <li>
-                  <strong>Mature Ecosystem:</strong> Decades of optimized
-                  libraries
-                </li>
-                <li>
-                  <strong>Industry Standard:</strong> Used by most trading firms
-                </li>
-                <li>
-                  <strong>Fine Control:</strong> Optimize every byte and cycle
-                </li>
-              </ul>
-              <div class="performance-summary">
-                <span class="summary-label">Typical Performance:</span>
-                <span class="summary-value">38,000+ orders/sec</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="verdict-card">
-            <h4>The Verdict</h4>
-            <p>
-              In our tests, <strong>Rust typically wins</strong> for order
-              processing due to its excellent concurrency model and memory
-              safety. However, <strong>C++ can be faster</strong> for specific
-              optimized operations. The real winner?
-              <strong>Both languages are incredibly fast</strong> - much faster
-              than traditional languages like Python or Java for high-frequency
-              trading!
-            </p>
-
-            <div class="real-world-note">
-              <strong>Real World:</strong> Most trading firms use C++ for legacy
-              reasons, but many are adopting Rust for new systems due to its
-              safety and performance guarantees.
+              <span class="stat-label">DELTA</span>
+              <span class="stat-value" id="speed-difference">-</span>
             </div>
           </div>
         </div>
@@ -186,19 +58,15 @@
 
       <div class="main-content">
         <div class="left-panel">
-          <!-- Language Performance Comparison -->
           <div class="card performance-card">
-            <h3>Live Performance Comparison</h3>
+            <h3>Engine Telemetry</h3>
             <div class="performance-grid">
               <div class="perf-section rust-section">
-                <div class="lang-header">
-                  <span class="lang-icon">RS</span>
-                  <span class="lang-name">Rust</span>
-                </div>
+                <div class="lang-header">Rust Engine (BTreeMap)</div>
                 <div class="perf-metrics">
                   <div class="metric-item">
-                    <span class="metric-label">Orders/sec</span>
-                    <span class="metric-value" id="rust-orders-sec">0</span>
+                    <span class="metric-label">Throughput</span>
+                    <span class="metric-value" id="rust-orders-sec">0 ops/s</span>
                   </div>
                   <div class="metric-item">
                     <span class="metric-label">Latency</span>
@@ -211,14 +79,11 @@
                 </div>
               </div>
               <div class="perf-section cpp-section">
-                <div class="lang-header">
-                  <span class="lang-icon">C++</span>
-                  <span class="lang-name">C++</span>
-                </div>
+                <div class="lang-header">C++20 Engine (std::map)</div>
                 <div class="perf-metrics">
                   <div class="metric-item">
-                    <span class="metric-label">Orders/sec</span>
-                    <span class="metric-value" id="cpp-orders-sec">0</span>
+                    <span class="metric-label">Throughput</span>
+                    <span class="metric-value" id="cpp-orders-sec">0 ops/s</span>
                   </div>
                   <div class="metric-item">
                     <span class="metric-label">Latency</span>
@@ -236,11 +101,6 @@
           <div class="card">
             <h3>
               Order Book Depth
-              <span class="tooltip"
-                >i<span class="tooltiptext"
-                  >Live buy/sell orders for selected Magnificent 7 stock</span
-                ></span
-              >
             </h3>
             <div class="orderbook-container">
               <div class="orderbook-side asks">
@@ -252,7 +112,7 @@
                 <div id="asks-list" class="orders-list"></div>
               </div>
               <div class="spread-indicator">
-                <div class="spread-value" id="spread">Spread: $0.00</div>
+                <div class="spread-value" id="spread">SPREAD: 0.00</div>
               </div>
               <div class="orderbook-side bids">
                 <div id="bids-list" class="orders-list"></div>
@@ -266,23 +126,15 @@
           </div>
 
           <div class="card">
-            <h3>
-              Performance Metrics
-              <span class="tooltip"
-                >i<span class="tooltiptext"
-                  >Real-time system performance - shows how fast our lock-free
-                  system processes orders</span
-                ></span
-              >
-            </h3>
+            <h3>Global System Metrics</h3>
             <div class="metrics-grid">
               <div class="metric">
                 <div class="metric-value" id="total-orders">0</div>
-                <div class="metric-label">Total Orders</div>
+                <div class="metric-label">Orders</div>
               </div>
               <div class="metric">
                 <div class="metric-value" id="total-trades">0</div>
-                <div class="metric-label">Total Trades</div>
+                <div class="metric-label">Trades</div>
               </div>
               <div class="metric">
                 <div class="metric-value" id="volume">0</div>
@@ -290,7 +142,7 @@
               </div>
               <div class="metric">
                 <div class="metric-value" id="throughput">0</div>
-                <div class="metric-label">Orders/sec</div>
+                <div class="metric-label">Ops/Sec</div>
               </div>
             </div>
           </div>
@@ -298,14 +150,7 @@
 
         <div class="right-panel">
           <div class="card">
-            <h3>
-              Recent Trades
-              <span class="tooltip"
-                >i<span class="tooltiptext"
-                  >Live trades happening when buy and sell orders match</span
-                ></span
-              >
-            </h3>
+            <h3>Time & Sales</h3>
             <div class="trades-container">
               <div class="trades-header">
                 <span>Time</span>
@@ -317,14 +162,7 @@
           </div>
 
           <div class="card">
-            <h3>
-              Live Price Chart
-              <span class="tooltip"
-                >i<span class="tooltiptext"
-                  >Real-time Apple stock price movement</span
-                ></span
-              >
-            </h3>
+            <h3>Price Chart</h3>
             <div class="chart-container">
               <canvas id="price-chart"></canvas>
             </div>
@@ -333,40 +171,19 @@
       </div>
 
       <footer class="footer">
-        <div class="footer-content">
-          <div class="tech-stack">
-            <span class="tech-item rust">Rust</span>
-            <span class="tech-item cpp">C++</span>
-            <span class="tech-item js">JavaScript</span>
-            <span class="tech-item ws">WebSocket</span>
-          </div>
-          <div class="footer-info">
-            <p>Built with lock-free programming for maximum performance</p>
-            <div class="links">
-              <a
-                href="https://github.com/yourusername/lock-free-order-book"
-                target="_blank"
-                >📚 View Code</a
-              >
-              <a href="#" onclick="toggleEducation()">🎓 Learn More</a>
-            </div>
+        <div class="tech-stack">
+          <span class="tech-item">Node.js Gateway</span>
+          <span class="tech-item rust">Rust (Criterion)</span>
+          <span class="tech-item cpp">C++20 (Google Benchmark)</span>
+        </div>
+        <div class="footer-info">
+          <div class="links">
+            <a href="https://github.com/sabdulmajid/lock-free-order-book" target="_blank">View Repository</a>
           </div>
         </div>
       </footer>
     </div>
 
     <script src="dashboard.js"></script>
-    <script>
-      function toggleEducation() {
-        const details = document.getElementById("education-details");
-        const isVisible = details.style.display !== "none";
-        details.style.display = isVisible ? "none" : "block";
-
-        // Smooth scroll to education section when opening
-        if (!isVisible) {
-          details.scrollIntoView({ behavior: "smooth" });
-        }
-      }
-    </script>
   </body>
 </html>
