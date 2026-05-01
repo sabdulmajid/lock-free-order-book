@@ -16,6 +16,8 @@ This project was built to empirically evaluate the performance, safety, and late
 ## 🚀 Live Demo & Deployment
 This application is fully containerized and production-ready. 
 
+**Live Demo:** [https://lock-free-order-book.onrender.com](https://lock-free-order-book.onrender.com)
+
 **No login is required to view the dashboard!** If you run this locally, please ensure that port `3000` is free (or change the `PORT` env variable) to avoid conflicts with other local services like Open WebUI.
 
 ### Deploying to Render / Railway
