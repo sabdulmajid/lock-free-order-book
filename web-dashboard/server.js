@@ -3,7 +3,8 @@ const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
 const path = require('path');
-const axios = require('axios');
+const { spawn } = require('child_process');
+const readline = require('readline');
 
 const app = express();
 const server = http.createServer(app);
@@ -17,14 +18,13 @@ const io = socketIo(server, {
 app.use(cors());
 app.use(express.static('public'));
 
-// Serve the dashboard
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // API endpoint for current market data
-app.get('/api/snapshot', (req, res) => {
-  const snapshot = simulator.getOrderBookSnapshot();
+app.get('/api/snapshot', async (req, res) => {
+  const snapshot = await simulator.getOrderBookSnapshot();
   res.json({
     success: true,
     data: snapshot,
@@ -41,13 +41,66 @@ app.get('/api/info', (req, res) => {
       version: "1.0.0",
       languages: ["Rust", "C++", "JavaScript"],
       features: ["Real-time data", "Lock-free architecture", "Educational content"],
-      symbol: simulator.symbol,
+      symbol: simulator.currentSymbol,
       description: "High-performance order book with real market data integration"
     }
   });
 });
 
-// Magnificent 7 stocks data
+class Engine {
+  constructor(name, cmd, args) {
+    this.name = name;
+    this.process = spawn(cmd, args, { cwd: path.join(__dirname, '..') });
+    this.rl = readline.createInterface({ input: this.process.stdout });
+    
+    this.snapshotCb = null;
+    this.latestSnapshot = { bids: [], asks: [] };
+    this.perf = {
+      ordersPerSec: 0,
+      latency: 0,
+      memory: 0,
+      totalProcessed: 0
+    };
+
+    this.rl.on('line', (line) => {
+      try {
+        const data = JSON.parse(line);
+        if (data.type === 'batch_result') {
+          // Update perf metrics (simplistic moving average)
+          this.perf.latency = Math.floor(data.latency_ns / 1000); // microseconds
+          this.perf.totalProcessed += data.processed;
+          // Orders per sec estimate based on recent batch
+          if (data.latency_ns > 0) {
+            const currentOps = Math.floor((data.processed / data.latency_ns) * 1e9);
+            this.perf.ordersPerSec = Math.floor(this.perf.ordersPerSec * 0.8 + currentOps * 0.2);
+          }
+        } else if (data.type === 'snapshot') {
+          this.latestSnapshot = data;
+          if (this.snapshotCb) {
+            this.snapshotCb(data);
+            this.snapshotCb = null;
+          }
+        }
+      } catch(e) {
+        console.error(`[${this.name}] parse error:`, line);
+      }
+    });
+
+    this.process.stderr.on('data', data => console.error(`[${this.name}] stderr:`, data.toString()));
+  }
+
+  sendBatch(orders) {
+    this.process.stdin.write(JSON.stringify({ action: 'batch', orders }) + '\n');
+  }
+
+  requestSnapshot() {
+    return new Promise(resolve => {
+      this.snapshotCb = resolve;
+      this.process.stdin.write(JSON.stringify({ action: 'snapshot' }) + '\n');
+    });
+  }
+}
+
 const MAGNIFICENT_7 = {
   'AAPL': { name: 'Apple Inc.', basePrice: 175.0 },
   'GOOGL': { name: 'Alphabet Inc.', basePrice: 140.0 },
@@ -58,23 +111,16 @@ const MAGNIFICENT_7 = {
   'TSLA': { name: 'Tesla Inc.', basePrice: 240.0 }
 };
 
-// Real market data integration with Magnificent 7
-class MagnificentSevenSimulator {
+class Simulator {
   constructor() {
     this.orderIdCounter = 1;
     this.currentSymbol = 'AAPL';
     this.stockPrices = {};
-    this.priceHistory = {};
-    this.orderBooks = {};
-    this.trades = [];
     
-    // Initialize all stocks
     Object.keys(MAGNIFICENT_7).forEach(symbol => {
       this.stockPrices[symbol] = MAGNIFICENT_7[symbol].basePrice;
-      this.priceHistory[symbol] = [];
-      this.orderBooks[symbol] = { bids: new Map(), asks: new Map() };
     });
-    
+
     this.metrics = {
       totalOrders: 0,
       totalTrades: 0,
@@ -83,30 +129,14 @@ class MagnificentSevenSimulator {
       symbol: this.currentSymbol,
       companyName: MAGNIFICENT_7[this.currentSymbol].name
     };
-    
-    // Performance comparison data
-    this.rustPerformance = {
-      ordersPerSec: 0,
-      latency: 0,
-      memory: 0,
-      totalProcessed: 0
-    };
-    
-    this.cppPerformance = {
-      ordersPerSec: 0,
-      latency: 0,
-      memory: 0,
-      totalProcessed: 0
-    };
-    
-    this.lastPriceUpdate = Date.now();
-    this.updateAllPrices();
-    
-    // Update prices every 15 seconds
+
+    this.trades = [];
+
+    // Spin up real engines
+    this.rustEngine = new Engine('Rust', 'rust/target/release/order_book_rust', []);
+    this.cppEngine = new Engine('C++', 'cpp/build/order_book_cpp', []);
+
     setInterval(() => this.updateAllPrices(), 15000);
-    
-    // Update performance metrics every 2 seconds
-    setInterval(() => this.updatePerformanceMetrics(), 2000);
   }
 
   switchStock(symbol) {
@@ -115,191 +145,89 @@ class MagnificentSevenSimulator {
       this.metrics.symbol = symbol;
       this.metrics.companyName = MAGNIFICENT_7[symbol].name;
       this.metrics.lastPrice = this.stockPrices[symbol];
+      // Reset engines if we wanted realistic isolated stock states, but for now we share the book
     }
-  }
-
-  updatePerformanceMetrics() {
-    // Simulate realistic performance differences
-    const baseRustOps = 45000 + Math.random() * 10000;
-    const baseCppOps = 38000 + Math.random() * 8000;
-    
-    this.rustPerformance.ordersPerSec = Math.floor(baseRustOps);
-    this.rustPerformance.latency = Math.floor(250 + Math.random() * 100); // microseconds
-    this.rustPerformance.memory = Math.floor(45 + Math.random() * 10); // MB
-    this.rustPerformance.totalProcessed += this.rustPerformance.ordersPerSec * 2;
-    
-    this.cppPerformance.ordersPerSec = Math.floor(baseCppOps);
-    this.cppPerformance.latency = Math.floor(320 + Math.random() * 150); // microseconds
-    this.cppPerformance.memory = Math.floor(52 + Math.random() * 15); // MB
-    this.cppPerformance.totalProcessed += this.cppPerformance.ordersPerSec * 2;
   }
 
   updateAllPrices() {
     const now = new Date();
-    const timeBase = now.getMinutes() / 60; // 0 to 1 over an hour
+    const timeBase = now.getMinutes() / 60;
     
     Object.keys(MAGNIFICENT_7).forEach(symbol => {
       const basePrice = MAGNIFICENT_7[symbol].basePrice;
-      
-      // Different movement patterns for each stock
-      let priceMultiplier = 1;
-      switch(symbol) {
-        case 'NVDA':
-          priceMultiplier = 1 + Math.sin(timeBase * Math.PI * 2) * 0.03; // More volatile
-          break;
-        case 'TSLA':
-          priceMultiplier = 1 + Math.sin(timeBase * Math.PI * 3) * 0.025; // High frequency
-          break;
-        case 'META':
-          priceMultiplier = 1 + Math.sin(timeBase * Math.PI * 1.5) * 0.02;
-          break;
-        default:
-          priceMultiplier = 1 + Math.sin(timeBase * Math.PI * 2) * 0.015; // Stable
-      }
-      
-      // Add some randomness
+      const priceMultiplier = 1 + Math.sin(timeBase * Math.PI * 2) * 0.015;
       const randomVariation = (Math.random() - 0.5) * 0.01;
       this.stockPrices[symbol] = basePrice * (priceMultiplier + randomVariation);
-      
-      // Update current stock if it's selected
       if (symbol === this.currentSymbol) {
         this.metrics.lastPrice = this.stockPrices[symbol];
       }
     });
-    
-    console.log(`📈 Updated prices for all Magnificent 7 stocks`);
   }
 
-  generateOrder() {
-    const side = Math.random() < 0.5 ? 'buy' : 'sell';
+  generateOrderBatch() {
     const currentPrice = this.stockPrices[this.currentSymbol];
-    const spread = currentPrice * 0.001; // 0.1% spread
-    const priceVariation = (Math.random() - 0.5) * (currentPrice * 0.002);
+    const intensity = Math.random();
+    const orderCount = intensity > 0.8 ? Math.floor(Math.random() * 50) + 10 : Math.floor(Math.random() * 10) + 5;
     
-    let price;
-    if (side === 'buy') {
-      price = currentPrice - spread/2 + priceVariation;
-    } else {
-      price = currentPrice + spread/2 + priceVariation;
-    }
-    
-    price = Math.round(price * 100) / 100; // Round to 2 decimals
-    
-    const quantity = Math.floor(Math.random() * 500) + 50; // 50-550 shares
-    
-    return {
-      id: this.orderIdCounter++,
-      side,
-      price,
-      quantity,
-      timestamp: Date.now(),
-      symbol: this.currentSymbol
-    };
-  }
-
-  addOrderToBook(order) {
-    const symbol = order.symbol || this.currentSymbol;
-    const book = this.orderBooks[symbol];
-    const bookSide = order.side === 'buy' ? book.bids : book.asks;
-    
-    if (!bookSide.has(order.price)) {
-      bookSide.set(order.price, []);
-    }
-    bookSide.get(order.price).push(order);
-    
-    this.metrics.totalOrders++;
-  }
-
-  matchOrders() {
-    const trades = [];
-    const book = this.orderBooks[this.currentSymbol];
-    const bids = Array.from(book.bids.entries()).sort((a, b) => b[0] - a[0]);
-    const asks = Array.from(book.asks.entries()).sort((a, b) => a[0] - b[0]);
-    
-    if (bids.length === 0 || asks.length === 0) return trades;
-    
-    const bestBid = bids[0];
-    const bestAsk = asks[0];
-    
-    if (bestBid[0] >= bestAsk[0]) {
-      const bidOrders = bestBid[1];
-      const askOrders = bestAsk[1];
+    const orders = [];
+    for (let i = 0; i < orderCount; i++) {
+      const side = Math.random() < 0.5 ? 'buy' : 'sell';
+      const spread = currentPrice * 0.001;
+      const priceVariation = (Math.random() - 0.5) * (currentPrice * 0.002);
       
-      if (bidOrders.length > 0 && askOrders.length > 0) {
-        const bidOrder = bidOrders[0];
-        const askOrder = askOrders[0];
-        
-        const tradeQuantity = Math.min(bidOrder.quantity, askOrder.quantity);
-        const tradePrice = askOrder.price; // Price improvement for buyer
-        
-        trades.push({
-          id: Date.now(),
-          price: tradePrice,
-          quantity: tradeQuantity,
-          timestamp: Date.now(),
-          buyOrderId: bidOrder.id,
-          sellOrderId: askOrder.id
-        });
-        
-        bidOrder.quantity -= tradeQuantity;
-        askOrder.quantity -= tradeQuantity;
-        
-        if (bidOrder.quantity === 0) {
-          bidOrders.shift();
-          if (bidOrders.length === 0) {
-            book.bids.delete(bestBid[0]);
-          }
-        }
-        
-        if (askOrder.quantity === 0) {
-          askOrders.shift();
-          if (askOrders.length === 0) {
-            book.asks.delete(bestAsk[0]);
-          }
-        }
-        
-        this.currentPrice = tradePrice;
-        this.metrics.totalTrades++;
-        this.metrics.volume += tradeQuantity;
-        this.metrics.lastPrice = tradePrice;
-        this.trades.push(trades[0]);
-        
-        // Keep only last 100 trades
-        if (this.trades.length > 100) {
-          this.trades.shift();
-        }
-      }
+      let price = side === 'buy' ? currentPrice - spread/2 + priceVariation : currentPrice + spread/2 + priceVariation;
+      price = Math.round(price * 100) / 100;
+      const quantity = Math.floor(Math.random() * 500) + 50;
+
+      orders.push({
+        id: this.orderIdCounter++,
+        side,
+        price,
+        quantity,
+        symbol: this.currentSymbol
+      });
     }
-    
-    return trades;
+
+    this.metrics.totalOrders += orders.length;
+
+    // Simulate some trades for the UI (since the naive engines might not return trade events effectively via JSON yet)
+    if (Math.random() > 0.7 && orders.length > 0) {
+        const t = orders[0];
+        const tradePrice = t.price;
+        this.trades.push({
+            id: Date.now(),
+            price: tradePrice,
+            quantity: t.quantity,
+            timestamp: Date.now(),
+            buyOrderId: t.id,
+            sellOrderId: t.id + 1
+        });
+        this.metrics.totalTrades++;
+        this.metrics.volume += t.quantity;
+        this.metrics.lastPrice = tradePrice;
+        if (this.trades.length > 50) this.trades.shift();
+    }
+
+    return orders;
   }
 
-  getOrderBookSnapshot() {
-    const currentPrice = this.stockPrices[this.currentSymbol];
-    let bids = [];
-    let asks = [];
+  async getOrderBookSnapshot() {
+    // Generate new orders
+    const orders = this.generateOrderBatch();
+    
+    // Send to both engines
+    this.rustEngine.sendBatch(orders);
+    this.cppEngine.sendBatch(orders);
 
-    // Generate realistic bid levels (below current price)
-    for (let i = 0; i < 20; i++) {
-      const price = currentPrice - (currentPrice * 0.001) - (i * currentPrice * 0.0005);
-      const quantity = Math.floor(Math.random() * 1000) + 100;
-      bids.push({
-        price: Math.round(price * 100) / 100,
-        quantity,
-        orderCount: Math.floor(Math.random() * 5) + 1,
-      });
-    }
+    // Request snapshots
+    const [rustSnap, cppSnap] = await Promise.all([
+      this.rustEngine.requestSnapshot(),
+      this.cppEngine.requestSnapshot()
+    ]);
 
-    // Generate realistic ask levels (above current price)
-    for (let i = 0; i < 20; i++) {
-      const price = currentPrice + (currentPrice * 0.001) + (i * currentPrice * 0.0005);
-      const quantity = Math.floor(Math.random() * 1000) + 100;
-      asks.push({
-        price: Math.round(price * 100) / 100,
-        quantity,
-        orderCount: Math.floor(Math.random() * 5) + 1,
-      });
-    }
+    // Use Rust's snapshot as the canonical one for the UI since they process the same data
+    const bids = rustSnap.bids || [];
+    const asks = rustSnap.asks || [];
 
     return {
       bids,
@@ -307,74 +235,40 @@ class MagnificentSevenSimulator {
       trades: this.trades.slice(-10).reverse(),
       metrics: {
         ...this.metrics,
-        rustPerformance: this.rustPerformance,
-        cppPerformance: this.cppPerformance
+        rustPerformance: this.rustEngine.perf,
+        cppPerformance: this.cppEngine.perf
       },
       stockInfo: {
         symbol: this.currentSymbol,
         name: MAGNIFICENT_7[this.currentSymbol].name,
-        price: currentPrice
+        price: this.stockPrices[this.currentSymbol]
       }
     };
   }
-
-  simulateMarket() {
-    // Add some orders with varying intensity
-    const intensity = Math.random();
-    const orderCount = intensity > 0.8 ? Math.floor(Math.random() * 8) + 3 : Math.floor(Math.random() * 3) + 1;
-    
-    for (let i = 0; i < orderCount; i++) {
-      const order = this.generateOrder();
-      this.addOrderToBook(order);
-    }
-    
-    // Try to match orders
-    const trades = this.matchOrders();
-    
-    return {
-      snapshot: this.getOrderBookSnapshot(),
-      newTrades: trades
-    };
-  }
 }
 
-const simulator = new MagnificentSevenSimulator();
+const simulator = new Simulator();
 
-// Initialize with some orders
-for (let i = 0; i < 50; i++) {
-  const order = simulator.generateOrder();
-  simulator.addOrderToBook(order);
-}
+// Pre-fill some data
+for(let i=0; i<10; i++) simulator.generateOrderBatch();
 
-io.on('connection', (socket) => {
-  console.log('Client connected');
-  
-  // Send initial snapshot
-  socket.emit('orderbook-snapshot', simulator.getOrderBookSnapshot());
-  
-  socket.on('switch-stock', (symbol) => {
-    console.log(`Client switching to ${symbol}`);
+io.on('connection', async (socket) => {
+  socket.emit('orderbook-snapshot', await simulator.getOrderBookSnapshot());
+  socket.on('switch-stock', async (symbol) => {
     simulator.switchStock(symbol);
-    socket.emit('orderbook-snapshot', simulator.getOrderBookSnapshot());
-  });
-  
-  socket.on('disconnect', () => {
-    console.log('Client disconnected');
+    socket.emit('orderbook-snapshot', await simulator.getOrderBookSnapshot());
   });
 });
 
-// Simulate market activity
-setInterval(() => {
-  const result = simulator.simulateMarket();
-  io.emit('orderbook-update', result.snapshot);
-  
-  if (result.newTrades.length > 0) {
-    io.emit('new-trades', result.newTrades);
+setInterval(async () => {
+  const snapshot = await simulator.getOrderBookSnapshot();
+  io.emit('orderbook-update', snapshot);
+  if (snapshot.trades && snapshot.trades.length > 0) {
+    io.emit('new-trades', snapshot.trades);
   }
-}, 100); // Update every 100ms
+}, 100);
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-  console.log(`Dashboard available at http://localhost:${PORT}`);
 });

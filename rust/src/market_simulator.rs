@@ -1,9 +1,7 @@
 use crate::order::{Order, Side};
 use crate::order_book::OrderBook;
-use crate::trade::Trade;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -98,7 +96,7 @@ impl MarketSimulator {
         Order::new(self.order_id_counter, side, price_cents, quantity)
     }
 
-    fn add_order_to_book(&mut self, mut order: Order) {
+    fn add_order_to_book(&mut self, order: Order) {
         self.order_id_counter += 1;
         self.metrics.total_orders += 1;
         
@@ -149,7 +147,7 @@ impl MarketSimulator {
         self.current_price = trade_price;
     }
 
-    pub fn get_snapshot(&self) -> OrderBookSnapshot {
+    pub fn get_snapshot(&mut self) -> OrderBookSnapshot {
         // For now, we'll generate mock order book data
         // In a real implementation, this would extract from the actual order book
         let mut bids = Vec::new();

@@ -25,8 +25,10 @@ public:
     std::optional<double> get_best_ask() const;
 
 
-private:
-    std::vector<Trade> match_order(Order& order);
+public:
     std::map<double, PriceLevel, std::greater<double>> bids;
     std::map<double, PriceLevel> asks;
+
+private:
+    std::vector<Trade> match_order(Order& order);
 };

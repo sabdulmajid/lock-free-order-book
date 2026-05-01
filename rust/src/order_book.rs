@@ -1,6 +1,6 @@
-//! Represents the order book.
 use std::collections::{BTreeMap, VecDeque};
 use crate::order::{Order, Side};
+use crate::trade::Trade;
 
 pub struct PriceLevel {
     pub total_quantity: u64,
@@ -17,8 +17,8 @@ impl PriceLevel {
 }
 
 pub struct OrderBook {
-    bids: BTreeMap<u64, PriceLevel>,
-    asks: BTreeMap<u64, PriceLevel>,
+    pub bids: BTreeMap<u64, PriceLevel>,
+    pub asks: BTreeMap<u64, PriceLevel>,
 }
 
 impl OrderBook {
@@ -29,21 +29,104 @@ impl OrderBook {
         }
     }
 
-    pub fn add_order(&mut self, mut order: Order) {
+    fn match_order(&mut self, order: &mut Order) -> Vec<Trade> {
+        let mut trades = Vec::new();
+        
+        match order.side {
+            Side::Buy => {
+                let mut prices_to_remove = Vec::new();
+                for (price, level) in self.asks.iter_mut() {
+                    if order.price < *price || order.quantity == 0 {
+                        break;
+                    }
+                    
+                    while let Some(mut maker_order) = level.orders.pop_front() {
+                        if order.quantity == 0 {
+                            level.orders.push_front(maker_order);
+                            break;
+                        }
+                        
+                        let trade_qty = std::cmp::min(order.quantity, maker_order.quantity);
+                        trades.push(Trade::new(order.order_id, maker_order.order_id, trade_qty, *price));
+                        
+                        order.quantity -= trade_qty;
+                        maker_order.quantity -= trade_qty;
+                        level.total_quantity -= trade_qty;
+                        
+                        if maker_order.quantity > 0 {
+                            level.orders.push_front(maker_order);
+                        }
+                    }
+                    
+                    if level.orders.is_empty() {
+                        prices_to_remove.push(*price);
+                    }
+                }
+                
+                for price in prices_to_remove {
+                    self.asks.remove(&price);
+                }
+            },
+            Side::Sell => {
+                let mut prices_to_remove = Vec::new();
+                // We need to iterate bids in reverse (highest first)
+                for (price, level) in self.bids.iter_mut().rev() {
+                    if order.price > *price || order.quantity == 0 {
+                        break;
+                    }
+                    
+                    while let Some(mut maker_order) = level.orders.pop_front() {
+                        if order.quantity == 0 {
+                            level.orders.push_front(maker_order);
+                            break;
+                        }
+                        
+                        let trade_qty = std::cmp::min(order.quantity, maker_order.quantity);
+                        trades.push(Trade::new(order.order_id, maker_order.order_id, trade_qty, *price));
+                        
+                        order.quantity -= trade_qty;
+                        maker_order.quantity -= trade_qty;
+                        level.total_quantity -= trade_qty;
+                        
+                        if maker_order.quantity > 0 {
+                            level.orders.push_front(maker_order);
+                        }
+                    }
+                    
+                    if level.orders.is_empty() {
+                        prices_to_remove.push(*price);
+                    }
+                }
+                
+                for price in prices_to_remove {
+                    self.bids.remove(&price);
+                }
+            }
+        }
+        
+        trades
+    }
+
+    pub fn add_order(&mut self, mut order: Order) -> Vec<Trade> {
         order.timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos() as u64;
 
-        let (book_side, price) = match order.side {
-            Side::Buy => (&mut self.bids, order.price),
-            Side::Sell => (&mut self.asks, order.price),
-        };
+        let trades = self.match_order(&mut order);
 
-        // ...existing code...
-        let price_level = book_side.entry(price).or_insert_with(PriceLevel::new);
-        price_level.total_quantity += order.quantity;
-        price_level.orders.push_back(order);
+        if order.quantity > 0 {
+            let (book_side, price) = match order.side {
+                Side::Buy => (&mut self.bids, order.price),
+                Side::Sell => (&mut self.asks, order.price),
+            };
+
+            let price_level = book_side.entry(price).or_insert_with(PriceLevel::new);
+            price_level.total_quantity += order.quantity;
+            price_level.orders.push_back(order);
+        }
+
+        trades
     }
 
     pub fn cancel_order(&mut self, order_id: u64, side: Side, price: u64) -> bool {
@@ -82,5 +165,37 @@ impl OrderBook {
             }
         }
         false
+    }
+
+    pub fn get_snapshot(&self) -> crate::market_simulator::OrderBookSnapshot {
+        let mut bids = Vec::new();
+        for (price, level) in self.bids.iter().rev().take(20) {
+            bids.push(crate::market_simulator::PriceLevelData {
+                price: *price as f64 / 100.0,
+                quantity: level.total_quantity,
+                order_count: level.orders.len(),
+            });
+        }
+
+        let mut asks = Vec::new();
+        for (price, level) in self.asks.iter().take(20) {
+            asks.push(crate::market_simulator::PriceLevelData {
+                price: *price as f64 / 100.0,
+                quantity: level.total_quantity,
+                order_count: level.orders.len(),
+            });
+        }
+
+        crate::market_simulator::OrderBookSnapshot {
+            bids,
+            asks,
+            trades: Vec::new(),
+            metrics: crate::market_simulator::MetricsData {
+                total_orders: 0,
+                total_trades: 0,
+                volume: 0,
+                last_price: 0.0,
+            }
+        }
     }
 }

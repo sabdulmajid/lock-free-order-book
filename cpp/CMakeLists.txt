@@ -17,13 +17,22 @@ target_include_directories(order_book_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src
 # --- Main Executable ---
 add_executable(order_book_cpp src/main.cpp)
 target_link_libraries(order_book_cpp PRIVATE order_book_lib)
+target_include_directories(order_book_cpp PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
 
 enable_testing()
 
+include(FetchContent)
+FetchContent_Declare(
+  googlebenchmark
+  GIT_REPOSITORY https://github.com/google/benchmark.git
+  GIT_TAG v1.8.3
+)
+set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "Disable benchmark testing" FORCE)
+set(BENCHMARK_ENABLE_INSTALL OFF CACHE BOOL "Disable benchmark install" FORCE)
+FetchContent_MakeAvailable(googlebenchmark)
+
 # --- Benchmarks ---
 find_package(Threads REQUIRED)
-set(BENCHMARK_ENABLE_TESTING OFF)
-add_subdirectory(third_party/benchmark)
 
 add_executable(order_book_benches benches/order_book_benches.cpp)
 target_link_libraries(order_book_benches PRIVATE
@@ -51,3 +60,4 @@ target_link_libraries(concurrent_order_book_benches PRIVATE
   Threads::Threads
 )
 target_include_directories(concurrent_order_book_benches PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+

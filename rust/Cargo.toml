@@ -32,7 +32,3 @@ harness = false
 [[bin]]
 name = "order_book_rust"
 path = "src/main.rs"
-
-[[bin]]
-name = "websocket_server"
-path = "src/websocket_server.rs"
