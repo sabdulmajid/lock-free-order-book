@@ -1,6 +1,6 @@
-use std::collections::{BTreeMap, VecDeque};
 use crate::order::{Order, Side};
 use crate::trade::Trade;
+use std::collections::{BTreeMap, VecDeque};
 
 pub struct PriceLevel {
     pub total_quantity: u64,
@@ -16,9 +16,21 @@ impl PriceLevel {
     }
 }
 
+impl Default for PriceLevel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub struct OrderBook {
     pub bids: BTreeMap<u64, PriceLevel>,
     pub asks: BTreeMap<u64, PriceLevel>,
+}
+
+impl Default for OrderBook {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl OrderBook {
@@ -31,7 +43,7 @@ impl OrderBook {
 
     fn match_order(&mut self, order: &mut Order) -> Vec<Trade> {
         let mut trades = Vec::new();
-        
+
         match order.side {
             Side::Buy => {
                 let mut prices_to_remove = Vec::new();
@@ -39,34 +51,39 @@ impl OrderBook {
                     if order.price < *price || order.quantity == 0 {
                         break;
                     }
-                    
+
                     while let Some(mut maker_order) = level.orders.pop_front() {
                         if order.quantity == 0 {
                             level.orders.push_front(maker_order);
                             break;
                         }
-                        
+
                         let trade_qty = std::cmp::min(order.quantity, maker_order.quantity);
-                        trades.push(Trade::new(order.order_id, maker_order.order_id, trade_qty, *price));
-                        
+                        trades.push(Trade::new(
+                            order.order_id,
+                            maker_order.order_id,
+                            trade_qty,
+                            *price,
+                        ));
+
                         order.quantity -= trade_qty;
                         maker_order.quantity -= trade_qty;
                         level.total_quantity -= trade_qty;
-                        
+
                         if maker_order.quantity > 0 {
                             level.orders.push_front(maker_order);
                         }
                     }
-                    
+
                     if level.orders.is_empty() {
                         prices_to_remove.push(*price);
                     }
                 }
-                
+
                 for price in prices_to_remove {
                     self.asks.remove(&price);
                 }
-            },
+            }
             Side::Sell => {
                 let mut prices_to_remove = Vec::new();
                 // We need to iterate bids in reverse (highest first)
@@ -74,36 +91,41 @@ impl OrderBook {
                     if order.price > *price || order.quantity == 0 {
                         break;
                     }
-                    
+
                     while let Some(mut maker_order) = level.orders.pop_front() {
                         if order.quantity == 0 {
                             level.orders.push_front(maker_order);
                             break;
                         }
-                        
+
                         let trade_qty = std::cmp::min(order.quantity, maker_order.quantity);
-                        trades.push(Trade::new(order.order_id, maker_order.order_id, trade_qty, *price));
-                        
+                        trades.push(Trade::new(
+                            order.order_id,
+                            maker_order.order_id,
+                            trade_qty,
+                            *price,
+                        ));
+
                         order.quantity -= trade_qty;
                         maker_order.quantity -= trade_qty;
                         level.total_quantity -= trade_qty;
-                        
+
                         if maker_order.quantity > 0 {
                             level.orders.push_front(maker_order);
                         }
                     }
-                    
+
                     if level.orders.is_empty() {
                         prices_to_remove.push(*price);
                     }
                 }
-                
+
                 for price in prices_to_remove {
                     self.bids.remove(&price);
                 }
             }
         }
-        
+
         trades
     }
 
@@ -136,7 +158,11 @@ impl OrderBook {
         };
 
         if let Some(price_level) = book_side.get_mut(&price) {
-            if let Some(index) = price_level.orders.iter().position(|o| o.order_id == order_id) {
+            if let Some(index) = price_level
+                .orders
+                .iter()
+                .position(|o| o.order_id == order_id)
+            {
                 let order = price_level.orders.remove(index).unwrap();
                 price_level.total_quantity -= order.quantity;
                 if price_level.orders.is_empty() {
@@ -148,7 +174,13 @@ impl OrderBook {
         false
     }
 
-    pub fn modify_order(&mut self, order_id: u64, side: Side, price: u64, new_quantity: u64) -> bool {
+    pub fn modify_order(
+        &mut self,
+        order_id: u64,
+        side: Side,
+        price: u64,
+        new_quantity: u64,
+    ) -> bool {
         let book_side = match side {
             Side::Buy => &mut self.bids,
             Side::Sell => &mut self.asks,
@@ -195,7 +227,7 @@ impl OrderBook {
                 total_trades: 0,
                 volume: 0,
                 last_price: 0.0,
-            }
+            },
         }
     }
 }

@@ -64,11 +64,13 @@ mod tests {
                 for i in 0..orders_per {
                     let id = (t * orders_per + i) as u64;
                     let order = Order::new(id, Side::Sell, 100, 1);
-                    while producer.push(order.clone()).is_err() {}
+                    while producer.push(order).is_err() {}
                 }
             }));
         }
-        for h in handles { h.join().unwrap(); }
+        for h in handles {
+            h.join().unwrap();
+        }
         // Drain
         let mut count = 0;
         while let Some(_o) = q.pop() {
@@ -79,8 +81,8 @@ mod tests {
 
     #[test]
     fn order_book_concurrent_processing() {
-        use crate::order_book::OrderBook;
         use crate::order::Side;
+        use crate::order_book::OrderBook;
         let producers = 4;
         let orders_per = 1000;
         let queue = Arc::new(OrderQueue::new(producers * orders_per));
@@ -90,11 +92,13 @@ mod tests {
             handles.push(thread::spawn(move || {
                 for i in 0..orders_per {
                     let order = Order::new((t * orders_per + i) as u64, Side::Buy, 100, 1);
-                    while q.push(order.clone()).is_err() {}
+                    while q.push(order).is_err() {}
                 }
             }));
         }
-        for h in handles { h.join().unwrap(); }
+        for h in handles {
+            h.join().unwrap();
+        }
         let mut book = OrderBook::new();
         let mut count = 0;
         while let Some(order) = queue.pop() {

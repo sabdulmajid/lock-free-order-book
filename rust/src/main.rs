@@ -31,7 +31,11 @@ fn main() {
                         for o in orders {
                             let id = o["id"].as_u64().unwrap_or(0);
                             let side_str = o["side"].as_str().unwrap_or("buy");
-                            let side = if side_str == "buy" { Side::Buy } else { Side::Sell };
+                            let side = if side_str == "buy" {
+                                Side::Buy
+                            } else {
+                                Side::Sell
+                            };
                             let price_f64 = o["price"].as_f64().unwrap_or(0.0);
                             let price = (price_f64 * 100.0).round() as u64;
                             let quantity = o["quantity"].as_u64().unwrap_or(0);
@@ -50,7 +54,7 @@ fn main() {
                         "processed": processed
                     });
 
-                    writeln!(stdout, "{}", resp.to_string()).unwrap();
+                    writeln!(stdout, "{resp}").unwrap();
                     stdout.flush().unwrap();
                 } else if action == "snapshot" {
                     let snapshot = book.get_snapshot();
@@ -60,7 +64,7 @@ fn main() {
                         "asks": snapshot.asks
                     });
 
-                    writeln!(stdout, "{}", resp.to_string()).unwrap();
+                    writeln!(stdout, "{resp}").unwrap();
                     stdout.flush().unwrap();
                 }
             }
@@ -69,7 +73,7 @@ fn main() {
                     "type": "error",
                     "message": e.to_string()
                 });
-                writeln!(stdout, "{}", resp.to_string()).unwrap();
+                writeln!(stdout, "{resp}").unwrap();
                 stdout.flush().unwrap();
             }
         }

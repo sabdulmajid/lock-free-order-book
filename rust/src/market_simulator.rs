@@ -51,6 +51,12 @@ pub struct MarketSimulator {
     rng: StdRng,
 }
 
+impl Default for MarketSimulator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MarketSimulator {
     pub fn new() -> Self {
         let mut simulator = MarketSimulator {
@@ -81,25 +87,29 @@ impl MarketSimulator {
     }
 
     fn generate_order(&mut self) -> Order {
-        let side = if self.rng.gen::<bool>() { Side::Buy } else { Side::Sell };
+        let side = if self.rng.gen::<bool>() {
+            Side::Buy
+        } else {
+            Side::Sell
+        };
         let spread = 0.5;
         let price_variation = (self.rng.gen::<f64>() - 0.5) * 2.0; // -1 to 1
-        
+
         let price = match side {
             Side::Buy => self.current_price - spread / 2.0 + price_variation,
             Side::Sell => self.current_price + spread / 2.0 + price_variation,
         };
-        
+
         let price_cents = (price * 100.0).round() as u64;
         let quantity = self.rng.gen_range(10..=100);
-        
+
         Order::new(self.order_id_counter, side, price_cents, quantity)
     }
 
     fn add_order_to_book(&mut self, order: Order) {
         self.order_id_counter += 1;
         self.metrics.total_orders += 1;
-        
+
         // For simulation, we'll add the order directly
         // In a real system, this would go through the matching engine
         self.order_book.add_order(order);
@@ -123,7 +133,7 @@ impl MarketSimulator {
     fn generate_trade(&mut self) {
         let trade_price = self.current_price + (self.rng.gen::<f64>() - 0.5) * 0.2;
         let trade_quantity = self.rng.gen_range(10..=50);
-        
+
         let trade = TradeData {
             id: self.order_id_counter,
             price: trade_price,

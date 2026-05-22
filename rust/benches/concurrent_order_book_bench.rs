@@ -1,10 +1,9 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use std::sync::{Arc, Mutex};
-use std::thread;
 use lock_free_order_book::concurrent_queue::OrderQueue;
 use lock_free_order_book::order::{Order, Side};
 use lock_free_order_book::order_book::OrderBook;
-use std::time::Duration;
+use std::sync::{Arc, Mutex};
+use std::thread;
 
 fn bench_concurrent_order_book(c: &mut Criterion) {
     let producers = 4;
@@ -24,7 +23,7 @@ fn bench_concurrent_order_book(c: &mut Criterion) {
                         let id = (t * orders_per + i) as u64;
                         let order = Order::new(id, Side::Buy, 100, 1);
                         // spin until pushed
-                        while q.push(order.clone()).is_err() {}
+                        while q.push(order).is_err() {}
                     }
                 }));
             }

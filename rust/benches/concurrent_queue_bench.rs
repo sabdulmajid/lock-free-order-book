@@ -41,7 +41,7 @@ fn bench_mpsc_queue(c: &mut Criterion) {
                     for i in 0..per {
                         let id = (t * per + i) as u64;
                         let order = Order::new(id, Side::Sell, 100, 1);
-                        while q.push(order.clone()).is_err() {}
+                        while q.push(order).is_err() {}
                     }
                 }));
             }
