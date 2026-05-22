@@ -1,157 +1,81 @@
-# 🚀 Lock-Free Order Book Dashboard
+# Web Dashboard
 
-A real-time visualization dashboard for the lock-free order book implementation, showcasing live market data, order book depth, and performance metrics.
+The dashboard is a Socket.IO-driven institutional-style terminal for the dual-engine order book. It renders a compact instrument strip, 20-level depth, spread state, 32-print time-and-sales tape, Rust/C++ throughput and latency telemetry, parity counters, and price/performance canvases.
 
-## Features
+## Runtime Contract
 
-- **Real-time Order Book Visualization** - Live depth chart with bids/asks
-- **Trade Stream** - Recent trades with timestamps and prices  
-- **Performance Metrics** - Orders/sec, total volume, trade count
-- **Price Chart** - Live price movement visualization
-- **WebSocket Integration** - Low-latency real-time updates
-- **Responsive Design** - Works on desktop and mobile
+`server.js` owns the market simulator, starts the Rust and C++ binaries, sends each engine identical JSON-line batches over stdin, reads latency and snapshot responses from stdout, and broadcasts normalized state to connected browsers. The stream loop targets an 8 ms cadence by default and schedules the next tick only after the current native-engine round trip completes, preventing websocket backlog when a local machine cannot sustain peak cadence.
 
-## Quick Start
+The browser client keeps rendering work off the socket callback path. Incoming deltas update an in-memory state object, then one pending `requestAnimationFrame` refresh writes into pooled DOM rows and canvas contexts. Depth and trade rows are allocated once at startup; hot updates mutate `textContent`, class names, and canvas pixels only.
 
-### Option 1: Node.js Dashboard (Recommended for Demo)
+## Throughput Guardrails
+
+| Layer              | Mechanism                                                      | Production Constraint                                                                           |
+| ------------------ | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Native process I/O | JSON-line stdin/stdout protocol with bounded command timeouts  | Engines must answer batch and snapshot requests before the next websocket emission is queued.   |
+| Parity accounting  | Rust/C++ processed-count and depth comparison counters         | Format compatibility is checked without mutating the historical dashboard payload shape.        |
+| WebSocket loop     | Single in-flight snapshot chain and cadence-aware rescheduling | Slow native rounds reduce emission frequency instead of accumulating unbounded pending updates. |
+| Browser rendering  | `requestAnimationFrame`, preallocated rows, and canvas traces  | Socket callbacks only replace state; the frame callback performs DOM and canvas writes.         |
+| Runtime logging    | Compact server errors and opt-in native stderr forwarding      | Production logs retain health deltas without streaming verbose local engine diagnostics.        |
+
+## Local Run
+
+Build both native engines before starting the dashboard:
 
 ```bash
-cd web-dashboard
+cd ../cpp
+cmake -S . -B build
+cmake --build build --target order_book_cpp
+
+cd ../rust
+cargo build --release --bin order_book_rust
+
+cd ../web-dashboard
 npm install
 npm start
 ```
 
-Visit `http://localhost:3000` to see the dashboard in action!
+Open `http://localhost:3000`.
 
-### Option 2: Rust WebSocket Server + Dashboard
+## Production Runtime
 
-```bash
-# Terminal 1: Start Rust WebSocket server
-cd rust
-cargo run --bin websocket_server
+The container entrypoint runs `node server.js` directly and reads the listener port from `PORT`, with `3000` only as a local fallback. Native engine paths are configurable through `CPP_ENGINE_PATH` and `RUST_ENGINE_PATH`; the production image sets them to the stripped binaries copied from the C++ and Rust build stages. `STREAM_INTERVAL_MS` defaults to `8`, `ENGINE_COMMAND_TIMEOUT_MS` defaults to `5000`, and native stderr is suppressed unless `LOG_ENGINE_STDERR=1` is explicitly set.
 
-# Terminal 2: Start Node.js dashboard (modify to connect to Rust server)
-cd web-dashboard
-npm start
-```
+## Socket Events
 
-## Architecture
+Client to server:
 
-```
-┌─────────────────┐    WebSocket    ┌──────────────────┐
-│   Web Dashboard │ ◄──────────────► │  Market Simulator │
-│   (JavaScript)  │                 │   (Node.js/Rust)  │
-└─────────────────┘                 └──────────────────┘
-                                              │
-                                              ▼
-                                    ┌──────────────────┐
-                                    │ Lock-Free Order  │
-                                    │      Book        │
-                                    │   (Rust/C++)     │
-                                    └──────────────────┘
-```
+| Event          | Payload       | Purpose                                  |
+| -------------- | ------------- | ---------------------------------------- |
+| `switch-stock` | Symbol string | Changes the active simulated instrument. |
 
-## Technology Stack
+Server to client:
 
-- **Frontend**: HTML5, CSS3, JavaScript, Chart.js
-- **Backend**: Node.js + Socket.IO (demo) / Rust + Tokio (production)
-- **WebSocket**: Real-time bidirectional communication
-- **Order Book**: Lock-free implementation in Rust/C++
+| Event                | Payload                                    | Purpose                                             |
+| -------------------- | ------------------------------------------ | --------------------------------------------------- |
+| `orderbook-snapshot` | Full book, metrics, trades, stock metadata | Initial state after connect or symbol switch.       |
+| `orderbook-update`   | Full top-of-book state and metrics         | Streaming update from the simulator/native engines. |
+| `new-trades`         | Recent trade array                         | Tape updates derived from simulated executions.     |
 
-## Deployment
+## Rendering Constraints
 
-### Heroku (Easy)
+The UI intentionally avoids headers, footers, marketing panels, charting libraries, drop shadows, and card wrappers. Layout is a fixed terminal grid with 1 px neutral borders, monochrome-first typography, limited bid/ask accents, and stable row heights. Canvas traces replace Chart.js to avoid animation work and object churn under constant websocket deltas.
 
-```bash
-# In web-dashboard directory
-echo "web: node server.js" > Procfile
-git init
-git add .
-git commit -m "Initial commit"
-heroku create your-orderbook-dashboard
-git push heroku main
-```
+## Data Shape
 
-### Railway (Recommended)
-
-1. Connect your GitHub repo to Railway
-2. Deploy the `web-dashboard` directory
-3. Set environment variables if needed
-4. Get your public URL!
-
-### Vercel/Netlify
-
-For static hosting, you can deploy just the frontend and connect to a separate WebSocket server.
-
-## Performance
-
-The dashboard handles:
-- **100+ updates/second** without lag
-- **Real-time order book** with 20 price levels each side
-- **Live trade stream** with automatic scrolling
-- **Responsive charts** with smooth animations
-
-## Customization
-
-### Market Simulation Parameters
-
-Edit `server.js` to modify:
-- Order generation frequency
-- Price volatility
-- Spread width
-- Market depth
-
-### Visual Styling
-
-Edit `public/styles.css` to customize:
-- Color scheme
-- Layout
-- Animations
-- Responsive breakpoints
-
-### Chart Configuration
-
-Edit `public/dashboard.js` to modify:
-- Chart update frequency
-- Data retention period
-- Visual indicators
-
-## API Reference
-
-### WebSocket Events
-
-**Client → Server:**
-- `connect` - Establish connection
-
-**Server → Client:**
-- `orderbook-snapshot` - Initial order book state
-- `orderbook-update` - Incremental updates
-- `new-trades` - Recent trade executions
-
-### Data Formats
-
-```javascript
-// Order Book Snapshot
+```json
 {
-  "bids": [{"price": 99.50, "quantity": 1000, "orderCount": 3}],
-  "asks": [{"price": 100.50, "quantity": 800, "orderCount": 2}],
-  "trades": [{"price": 100.00, "quantity": 50, "timestamp": 1640995200000}],
-  "metrics": {"totalOrders": 1500, "totalTrades": 45, "volume": 12500}
+  "bids": [{ "price": 100.1, "quantity": 1200, "order_count": 4 }],
+  "asks": [{ "price": 100.2, "quantity": 900, "order_count": 3 }],
+  "trades": [{ "price": 100.15, "quantity": 200, "timestamp": 1710000000000 }],
+  "metrics": {
+    "totalOrders": 100000,
+    "totalTrades": 320,
+    "volume": 450000,
+    "lastPrice": 100.15,
+    "rustPerformance": { "ordersPerSec": 1000000, "latency": 40, "memory": 0 },
+    "cppPerformance": { "ordersPerSec": 1200000, "latency": 35, "memory": 0 }
+  },
+  "stockInfo": { "symbol": "AAPL", "name": "Apple Inc.", "price": 175.12 }
 }
 ```
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## License
-
-MIT License - see LICENSE file for details.
-
----
-
-**Built with ❤️ for high-frequency trading enthusiasts**
