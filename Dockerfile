@@ -1,43 +1,88 @@
-FROM ubuntu:22.04
+# syntax=docker/dockerfile:1.7
 
-# Prevent interactive prompts during apt-get
+ARG DEBIAN_RELEASE=trixie
+ARG NODE_VERSION=22
+ARG RUST_IMAGE=rust:1-slim-bookworm
+
+FROM debian:${DEBIAN_RELEASE}-slim AS cpp-build
 ENV DEBIAN_FRONTEND=noninteractive
+WORKDIR /src
 
-# Install dependencies for C++, Rust, and Node.js
-RUN apt-get update && apt-get install -y \
-    build-essential \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    binutils \
+    ca-certificates \
     cmake \
-    curl \
-    git \
-    pkg-config \
+    g++ \
+    ninja-build \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Node.js (v20)
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y nodejs
+COPY cpp/CMakeLists.txt cpp/CMakeLists.txt
+COPY cpp/src cpp/src
+COPY cpp/third_party cpp/third_party
 
-# Install Rust
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-ENV PATH="/root/.cargo/bin:${PATH}"
+RUN --mount=type=cache,target=/src/cpp/build \
+    cmake -S cpp -B cpp/build -G Ninja \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DLFOB_BUILD_BENCHMARKS=OFF \
+      -DLFOB_BUILD_TESTS=OFF \
+    && cmake --build cpp/build --target order_book_cpp \
+    && install -D cpp/build/order_book_cpp /out/cpp/build/order_book_cpp \
+    && strip /out/cpp/build/order_book_cpp
+
+FROM ${RUST_IMAGE} AS rust-build
+WORKDIR /src/rust
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    binutils \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY rust/Cargo.toml rust/Cargo.lock ./
+COPY rust/benches benches
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    mkdir -p src \
+    && printf 'fn main() {}' > src/main.rs \
+    && printf '' > src/lib.rs \
+    && \
+    cargo fetch --locked
+
+COPY rust/src src
+
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/src/rust/target \
+    cargo build --release --locked --bin order_book_rust \
+    && install -D target/release/order_book_rust /out/rust/target/release/order_book_rust \
+    && strip /out/rust/target/release/order_book_rust
+
+FROM node:${NODE_VERSION}-${DEBIAN_RELEASE}-slim AS node-deps
+WORKDIR /app/web-dashboard
+
+COPY web-dashboard/package.json web-dashboard/package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --omit=dev --no-audit --no-fund
+
+FROM node:${NODE_VERSION}-${DEBIAN_RELEASE}-slim AS runtime
+ENV NODE_ENV=production \
+    PORT=3000 \
+    STREAM_INTERVAL_MS=8 \
+    CPP_ENGINE_PATH=/app/cpp/build/order_book_cpp \
+    RUST_ENGINE_PATH=/app/rust/target/release/order_book_rust
 
 WORKDIR /app
 
-# Copy the entire project
-COPY . .
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    libstdc++6 \
+    && rm -rf /var/lib/apt/lists/*
 
-# Build C++ project
-WORKDIR /app/cpp
-RUN mkdir -p build && cd build && cmake .. && make order_book_cpp
+COPY --from=cpp-build /out/cpp/build/order_book_cpp ./cpp/build/order_book_cpp
+COPY --from=rust-build /out/rust/target/release/order_book_rust ./rust/target/release/order_book_rust
+COPY --from=node-deps /app/web-dashboard/node_modules ./web-dashboard/node_modules
+COPY web-dashboard/public ./web-dashboard/public
+COPY web-dashboard/server.js web-dashboard/package.json ./web-dashboard/
 
-# Build Rust project
-WORKDIR /app/rust
-RUN cargo build --release --bin order_book_rust
-
-# Setup Node.js dashboard
+USER node
 WORKDIR /app/web-dashboard
-RUN npm install
-
-# Expose port and start
-ENV PORT=3000
 EXPOSE 3000
-CMD ["npm", "start"]
+
+CMD ["node", "server.js"]
