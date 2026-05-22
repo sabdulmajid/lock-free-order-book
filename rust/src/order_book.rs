@@ -2,6 +2,8 @@ use crate::order::{Order, Side};
 use crate::trade::Trade;
 use std::collections::{BTreeMap, VecDeque};
 
+const MAX_DEPTH_LEVELS: usize = 20;
+
 pub struct PriceLevel {
     pub total_quantity: u64,
     pub orders: VecDeque<Order>,
@@ -146,9 +148,24 @@ impl OrderBook {
             let price_level = book_side.entry(price).or_insert_with(PriceLevel::new);
             price_level.total_quantity += order.quantity;
             price_level.orders.push_back(order);
+            self.prune_depth();
         }
 
         trades
+    }
+
+    fn prune_depth(&mut self) {
+        while self.bids.len() > MAX_DEPTH_LEVELS {
+            if let Some(worst_bid) = self.bids.keys().next().copied() {
+                self.bids.remove(&worst_bid);
+            }
+        }
+
+        while self.asks.len() > MAX_DEPTH_LEVELS {
+            if let Some(worst_ask) = self.asks.keys().next_back().copied() {
+                self.asks.remove(&worst_ask);
+            }
+        }
     }
 
     pub fn cancel_order(&mut self, order_id: u64, side: Side, price: u64) -> bool {
@@ -201,7 +218,7 @@ impl OrderBook {
 
     pub fn get_snapshot(&self) -> crate::market_simulator::OrderBookSnapshot {
         let mut bids = Vec::new();
-        for (price, level) in self.bids.iter().rev().take(20) {
+        for (price, level) in self.bids.iter().rev().take(MAX_DEPTH_LEVELS) {
             bids.push(crate::market_simulator::PriceLevelData {
                 price: *price as f64 / 100.0,
                 quantity: level.total_quantity,
@@ -210,7 +227,7 @@ impl OrderBook {
         }
 
         let mut asks = Vec::new();
-        for (price, level) in self.asks.iter().take(20) {
+        for (price, level) in self.asks.iter().take(MAX_DEPTH_LEVELS) {
             asks.push(crate::market_simulator::PriceLevelData {
                 price: *price as f64 / 100.0,
                 quantity: level.total_quantity,

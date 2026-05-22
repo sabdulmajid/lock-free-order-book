@@ -8,6 +8,8 @@ fn main() {
     let stdin = io::stdin();
     let mut stdout = io::stdout();
     let mut book = OrderBook::new();
+    let mut latency_min_ns = u64::MAX;
+    let mut latency_max_ns = 0_u64;
 
     for line in stdin.lock().lines() {
         let line = match line {
@@ -47,10 +49,14 @@ fn main() {
                     }
 
                     let latency = start.elapsed().as_nanos() as u64;
+                    latency_min_ns = latency_min_ns.min(latency);
+                    latency_max_ns = latency_max_ns.max(latency);
 
                     let resp = serde_json::json!({
                         "type": "batch_result",
                         "latency_ns": latency,
+                        "latency_min_ns": latency_min_ns,
+                        "latency_max_ns": latency_max_ns,
                         "processed": processed
                     });
 
