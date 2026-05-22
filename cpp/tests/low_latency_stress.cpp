@@ -203,6 +203,6 @@ int main() {
         return 1;
     }
 
-    std::cout << "low_latency_stress passed\n";
+    low_latency::emit_line("low_latency_stress passed");
     return 0;
 }
