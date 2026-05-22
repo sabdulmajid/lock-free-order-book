@@ -1,0 +1,9 @@
+.git
+cpp/build
+cpp/build-*
+cpp/third_party
+rust/target
+web-dashboard/node_modules
+**/coverage
+**/.cache
+**/*.log
