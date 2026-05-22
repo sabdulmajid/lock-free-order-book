@@ -1,188 +1,123 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Lock-Free Order Book Dashboard</title>
+    <title>Order Book Terminal</title>
     <script src="/socket.io/socket.io.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <div class="dashboard">
-      <header class="header">
-        <h1>Lock-Free Order Book</h1>
-        <div class="header-info">
-          <div class="stock-selector">
-            <select id="stock-selector" class="stock-dropdown">
-              <option value="AAPL">AAPL</option>
-              <option value="GOOGL">GOOGL</option>
-              <option value="AMZN">AMZN</option>
-              <option value="META">META</option>
-              <option value="MSFT">MSFT</option>
-              <option value="NVDA">NVDA</option>
-              <option value="TSLA">TSLA</option>
-            </select>
-            <div class="current-price">
-              <span class="price-label">LAST</span>
-              <span class="price-value" id="current-price">$0.00</span>
-            </div>
+    <main class="terminal">
+      <section class="pane instrument-strip" aria-label="Instrument and system state">
+        <div class="instrument-cell symbol-cell">
+          <select id="stock-selector" class="stock-dropdown" aria-label="Symbol">
+            <option value="AAPL">AAPL</option>
+            <option value="GOOGL">GOOGL</option>
+            <option value="AMZN">AMZN</option>
+            <option value="META">META</option>
+            <option value="MSFT">MSFT</option>
+            <option value="NVDA">NVDA</option>
+            <option value="TSLA">TSLA</option>
+          </select>
+          <span id="current-price" class="last-price">0.00</span>
+        </div>
+        <div class="instrument-cell connection-cell">
+          <span id="connection-status" class="status-dot"></span>
+          <span id="connection-text">DISCONNECTED</span>
+        </div>
+        <div class="instrument-cell">
+          <span class="label">ORD</span>
+          <span id="total-orders" class="value">0</span>
+        </div>
+        <div class="instrument-cell">
+          <span class="label">TRD</span>
+          <span id="total-trades" class="value">0</span>
+        </div>
+        <div class="instrument-cell">
+          <span class="label">VOL</span>
+          <span id="volume" class="value">0</span>
+        </div>
+        <div class="instrument-cell">
+          <span class="label">OPS</span>
+          <span id="throughput" class="value">0</span>
+        </div>
+        <div class="instrument-cell">
+          <span class="label">LEAD</span>
+          <span id="performance-winner" class="value">-</span>
+        </div>
+        <div class="instrument-cell">
+          <span class="label">DELTA</span>
+          <span id="speed-difference" class="value">-</span>
+        </div>
+      </section>
+
+      <section class="pane depth-pane" aria-label="Depth book">
+        <div class="pane-title">
+          <span>DEPTH</span>
+          <span id="spread">SPREAD 0.00</span>
+        </div>
+        <div class="depth-grid column-row">
+          <span>PX</span>
+          <span>SZ</span>
+          <span>NOTIONAL</span>
+        </div>
+        <div id="asks-list" class="book-side asks"></div>
+        <div class="spread-row">
+          <span>BID</span>
+          <span>ASK</span>
+          <span>EDGE</span>
+        </div>
+        <div id="bids-list" class="book-side bids"></div>
+      </section>
+
+      <section class="pane trades-pane" aria-label="Trade ticker">
+        <div class="pane-title">
+          <span>TIME SALES</span>
+          <span>LAST 32</span>
+        </div>
+        <div class="trade-row trade-columns">
+          <span>TIME</span>
+          <span>PX</span>
+          <span>SZ</span>
+        </div>
+        <div id="trades-list" class="trades-list"></div>
+      </section>
+
+      <section class="pane perf-pane" aria-label="Engine performance">
+        <div class="pane-title">
+          <span>ENGINE PERF</span>
+          <span>RUST / CXX</span>
+        </div>
+        <div class="perf-table">
+          <div class="perf-row">
+            <span>RUST OPS</span>
+            <span id="rust-orders-sec">0</span>
+            <span>LAT</span>
+            <span id="rust-latency">0us</span>
+            <span>MEM</span>
+            <span id="rust-memory">0MB</span>
           </div>
-          <div class="status-indicators">
-            <div class="status-item">
-              <span class="status-dot connected" id="connection-status"></span>
-              <span>LIVE</span>
-            </div>
+          <div class="perf-row">
+            <span>CXX OPS</span>
+            <span id="cpp-orders-sec">0</span>
+            <span>LAT</span>
+            <span id="cpp-latency">0us</span>
+            <span>MEM</span>
+            <span id="cpp-memory">0MB</span>
           </div>
         </div>
-      </header>
+        <canvas id="perf-chart" class="terminal-canvas"></canvas>
+      </section>
 
-      <div class="comparison-banner">
-        <div class="comparison-content">
-          <h3>Dual-Engine Performance Comparison</h3>
-          <p>
-            Real-time benchmarking of C++20 and Rust implementations processing identical order flow through lock-free data structures.
-          </p>
-          <div class="battle-stats">
-            <div class="stat-item">
-              <span class="stat-label">DOMINANT ENGINE</span>
-              <span class="stat-value" id="performance-winner">-</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-label">DELTA</span>
-              <span class="stat-value" id="speed-difference">-</span>
-            </div>
-          </div>
+      <section class="pane price-pane" aria-label="Price path">
+        <div class="pane-title">
+          <span>PRICE PATH</span>
+          <span id="price-sample-count">0</span>
         </div>
-      </div>
-
-      <div class="main-content">
-        <div class="left-panel">
-          <div class="card performance-card">
-            <h3>Engine Telemetry</h3>
-            <div class="performance-grid">
-              <div class="perf-section rust-section">
-                <div class="lang-header">Rust Engine (BTreeMap)</div>
-                <div class="perf-metrics">
-                  <div class="metric-item">
-                    <span class="metric-label">Throughput</span>
-                    <span class="metric-value" id="rust-orders-sec">0 ops/s</span>
-                  </div>
-                  <div class="metric-item">
-                    <span class="metric-label">Latency</span>
-                    <span class="metric-value" id="rust-latency">0μs</span>
-                  </div>
-                  <div class="metric-item">
-                    <span class="metric-label">Memory</span>
-                    <span class="metric-value" id="rust-memory">0MB</span>
-                  </div>
-                </div>
-              </div>
-              <div class="perf-section cpp-section">
-                <div class="lang-header">C++20 Engine (std::map)</div>
-                <div class="perf-metrics">
-                  <div class="metric-item">
-                    <span class="metric-label">Throughput</span>
-                    <span class="metric-value" id="cpp-orders-sec">0 ops/s</span>
-                  </div>
-                  <div class="metric-item">
-                    <span class="metric-label">Latency</span>
-                    <span class="metric-value" id="cpp-latency">0μs</span>
-                  </div>
-                  <div class="metric-item">
-                    <span class="metric-label">Memory</span>
-                    <span class="metric-value" id="cpp-memory">0MB</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="card">
-            <h3>
-              Order Book Depth
-            </h3>
-            <div class="orderbook-container">
-              <div class="orderbook-side asks">
-                <div class="side-header">
-                  <span>Price</span>
-                  <span>Size</span>
-                  <span>Total</span>
-                </div>
-                <div id="asks-list" class="orders-list"></div>
-              </div>
-              <div class="spread-indicator">
-                <div class="spread-value" id="spread">SPREAD: 0.00</div>
-              </div>
-              <div class="orderbook-side bids">
-                <div id="bids-list" class="orders-list"></div>
-                <div class="side-header">
-                  <span>Total</span>
-                  <span>Size</span>
-                  <span>Price</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="card">
-            <h3>Global System Metrics</h3>
-            <div class="metrics-grid">
-              <div class="metric">
-                <div class="metric-value" id="total-orders">0</div>
-                <div class="metric-label">Orders</div>
-              </div>
-              <div class="metric">
-                <div class="metric-value" id="total-trades">0</div>
-                <div class="metric-label">Trades</div>
-              </div>
-              <div class="metric">
-                <div class="metric-value" id="volume">0</div>
-                <div class="metric-label">Volume</div>
-              </div>
-              <div class="metric">
-                <div class="metric-value" id="throughput">0</div>
-                <div class="metric-label">Ops/Sec</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="right-panel">
-          <div class="card">
-            <h3>Time & Sales</h3>
-            <div class="trades-container">
-              <div class="trades-header">
-                <span>Time</span>
-                <span>Price</span>
-                <span>Size</span>
-              </div>
-              <div id="trades-list" class="trades-list"></div>
-            </div>
-          </div>
-
-          <div class="card">
-            <h3>Price Chart</h3>
-            <div class="chart-container">
-              <canvas id="price-chart"></canvas>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <footer class="footer">
-        <div class="tech-stack">
-          <span class="tech-item">Node.js Gateway</span>
-          <span class="tech-item rust">Rust (Criterion)</span>
-          <span class="tech-item cpp">C++20 (Google Benchmark)</span>
-        </div>
-        <div class="footer-info">
-          <div class="links">
-            <a href="https://github.com/sabdulmajid/lock-free-order-book" target="_blank">View Repository</a>
-          </div>
-        </div>
-      </footer>
-    </div>
+        <canvas id="price-chart" class="terminal-canvas"></canvas>
+      </section>
+    </main>
 
     <script src="dashboard.js"></script>
   </body>
