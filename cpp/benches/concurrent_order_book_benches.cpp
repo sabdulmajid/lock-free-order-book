@@ -1,11 +1,10 @@
+#include "../src/concurrent_queue.h"
+#include "../src/order_book.h"
 #include <benchmark/benchmark.h>
 #include <thread>
 #include <vector>
-#include "../src/concurrent_queue.h"
-#include "../src/order_book.h"
 
-template <typename T>
-static size_t next_pow2(T x) {
+template <typename T> static size_t next_pow2(T x) {
     size_t power = 1;
     while (power < static_cast<size_t>(x)) {
         power <<= 1;
@@ -24,12 +23,14 @@ static void BM_ConcurrentOrderBook(benchmark::State& state) {
         state.ResumeTiming();
 
         // Producers
-        std::vector<std::thread> threads;
+        std::vector<std::jthread> threads;
         for (int t = 0; t < producers; ++t) {
-            threads.emplace_back([&, t]() {
+            threads.emplace_back([&, t](std::stop_token stop_token) {
                 for (int i = 0; i < orders_per; ++i) {
                     Order o(static_cast<uint64_t>(t * orders_per + i), Side::Buy, 100.0, 1);
-                    while (!queue.try_push(o)) {}
+                    while (!stop_token.stop_requested() && !queue.try_push(o)) {
+                        std::this_thread::yield();
+                    }
                 }
             });
         }
@@ -46,7 +47,10 @@ static void BM_ConcurrentOrderBook(benchmark::State& state) {
             }
         }
 
-        for (auto& th : threads) th.join();
+        for (auto& th : threads) {
+            th.request_stop();
+            th.join();
+        }
     }
 }
 

@@ -1,8 +1,8 @@
+#include "../src/concurrent_queue.h"
+#include "../src/order.h"
 #include <benchmark/benchmark.h>
 #include <thread>
 #include <vector>
-#include "../src/concurrent_queue.h"
-#include "../src/order.h"
 
 static size_t next_pow2(size_t x) {
     size_t power = 1;
@@ -12,16 +12,17 @@ static size_t next_pow2(size_t x) {
     return power;
 }
 
-template <typename T>
-static void BM_SPSC_Queue(benchmark::State& state) {
+template <typename T> static void BM_SPSC_Queue(benchmark::State& state) {
     size_t total = state.range(0);
     for (auto _ : state) {
         ConcurrentQueue<T> queue(next_pow2(total));
         // Producer
-        std::thread prod([&] {
+        std::jthread prod([&](std::stop_token stop_token) {
             for (size_t i = 0; i < total; ++i) {
                 T data(i, Side::Buy, 100.0, 1);
-                while (!queue.try_push(data)) {}
+                while (!stop_token.stop_requested() && !queue.try_push(data)) {
+                    std::this_thread::yield();
+                }
             }
         });
 
@@ -35,24 +36,26 @@ static void BM_SPSC_Queue(benchmark::State& state) {
                 std::this_thread::yield();
             }
         }
+        prod.request_stop();
         prod.join();
     }
 }
 
-template <typename T>
-static void BM_MPSC_Queue(benchmark::State& state) {
+template <typename T> static void BM_MPSC_Queue(benchmark::State& state) {
     int producers = 4;
     size_t per = state.range(0);
     size_t total = producers * per;
     for (auto _ : state) {
         ConcurrentQueue<T> queue(next_pow2(total));
         // Producers
-        std::vector<std::thread> threads;
+        std::vector<std::jthread> threads;
         for (int t = 0; t < producers; ++t) {
-            threads.emplace_back([&, t] {
+            threads.emplace_back([&, t](std::stop_token stop_token) {
                 for (size_t i = 0; i < per; ++i) {
                     T data(t * per + i, Side::Buy, 100.0, 1);
-                    while (!queue.try_push(data)) {}
+                    while (!stop_token.stop_requested() && !queue.try_push(data)) {
+                        std::this_thread::yield();
+                    }
                 }
             });
         }
@@ -67,7 +70,10 @@ static void BM_MPSC_Queue(benchmark::State& state) {
                 std::this_thread::yield();
             }
         }
-        for (auto& th : threads) th.join();
+        for (auto& th : threads) {
+            th.request_stop();
+            th.join();
+        }
     }
 }
 

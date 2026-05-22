@@ -1,58 +1,94 @@
 #pragma once
 
+#include "low_latency.h"
+
 #include <atomic>
 #include <cstddef>
-#include <vector>
+#include <cstdint>
+#include <exception>
 #include <optional>
+#include <vector>
 
-template<typename T>
-class ConcurrentQueue {
-public:
-    explicit ConcurrentQueue(size_t capacity)
-        : buffer_(capacity),
-          capacity_(capacity),
-          mask_(capacity - 1),
-          sequence_(capacity),
-          enqueue_pos_(0),
-          dequeue_pos_(0) {
-        // capacity check
+template <low_latency::OrderLike T> class ConcurrentQueue {
+  public:
+    explicit ConcurrentQueue(std::size_t capacity) : buffer_(capacity), capacity_(capacity), mask_(capacity - 1) {
         if (capacity < 2 || (capacity & (capacity - 1)) != 0) {
-            throw std::invalid_argument("capacity must be a power of two and >= 2");
+            std::terminate();
         }
-        for (size_t i = 0; i < capacity_; ++i) {
-            sequence_[i].store(i, std::memory_order_relaxed);
+
+        for (std::size_t i = 0; i < capacity_; ++i) {
+            buffer_[i].sequence.store(i, std::memory_order_relaxed);
         }
     }
 
-    bool try_push(const T& data) {
-        size_t pos = enqueue_pos_.fetch_add(1, std::memory_order_relaxed);
-        size_t idx = pos & mask_;
-        size_t seq = sequence_[idx].load(std::memory_order_acquire);
-        if (seq == pos) {
-            buffer_[idx] = data;
-            sequence_[idx].store(pos + 1, std::memory_order_release);
-            return true;
+    bool try_push(const T& data) noexcept {
+        Cell* cell = nullptr;
+        std::size_t pos = enqueue_pos_.value.load(std::memory_order_relaxed);
+
+        for (;;) {
+            cell = &buffer_[pos & mask_];
+            const std::size_t seq = cell->sequence.load(std::memory_order_acquire);
+            const auto diff = static_cast<std::intptr_t>(seq) - static_cast<std::intptr_t>(pos);
+
+            if (diff == 0) {
+                if (enqueue_pos_.value.compare_exchange_weak(
+                        pos, pos + 1, std::memory_order_relaxed, std::memory_order_relaxed)) {
+                    break;
+                }
+            } else if (diff < 0) {
+                return false;
+            } else {
+                pos = enqueue_pos_.value.load(std::memory_order_relaxed);
+            }
         }
-        return false;
+
+        cell->data = data;
+        cell->sequence.store(pos + 1, std::memory_order_release);
+        return true;
     }
 
-    std::optional<T> try_pop() { // non-blocking pop
-        size_t pos = dequeue_pos_.fetch_add(1, std::memory_order_relaxed);
-        size_t idx = pos & mask_;
-        size_t seq = sequence_[idx].load(std::memory_order_acquire);
-        if (seq == pos + 1) {
-            T data = buffer_[idx];
-            sequence_[idx].store(pos + capacity_, std::memory_order_release);
-            return data;
+    std::optional<T> try_pop() noexcept {
+        Cell* cell = nullptr;
+        std::size_t pos = dequeue_pos_.value.load(std::memory_order_relaxed);
+
+        for (;;) {
+            cell = &buffer_[pos & mask_];
+            const std::size_t seq = cell->sequence.load(std::memory_order_acquire);
+            const auto diff = static_cast<std::intptr_t>(seq) - static_cast<std::intptr_t>(pos + 1);
+
+            if (diff == 0) {
+                if (dequeue_pos_.value.compare_exchange_weak(
+                        pos, pos + 1, std::memory_order_relaxed, std::memory_order_relaxed)) {
+                    break;
+                }
+            } else if (diff < 0) {
+                return std::nullopt;
+            } else {
+                pos = dequeue_pos_.value.load(std::memory_order_relaxed);
+            }
         }
-        return std::nullopt;
+
+        T data = cell->data;
+        cell->sequence.store(pos + capacity_, std::memory_order_release);
+        return data;
     }
 
-private:
-    std::vector<T> buffer_;
-    size_t capacity_;
-    size_t mask_;
-    std::vector<std::atomic<size_t>> sequence_;
-    std::atomic<size_t> enqueue_pos_;
-    std::atomic<size_t> dequeue_pos_;
+  private:
+    struct Cell {
+        std::atomic<std::size_t> sequence{0};
+        T data{};
+    };
+
+    struct alignas(low_latency::cache_line_size) CacheAlignedCursor {
+        std::atomic<std::size_t> value{0};
+    };
+
+    static_assert(alignof(CacheAlignedCursor) >= low_latency::cache_line_size);
+    static_assert(sizeof(CacheAlignedCursor) >= low_latency::cache_line_size);
+
+    std::vector<Cell> buffer_;
+    std::size_t capacity_{0};
+    std::size_t mask_{0};
+    CacheAlignedCursor enqueue_pos_;
+    CacheAlignedCursor dequeue_pos_;
 };

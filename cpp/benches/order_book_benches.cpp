@@ -1,5 +1,5 @@
-#include <benchmark/benchmark.h>
 #include "../src/order_book.h"
+#include <benchmark/benchmark.h>
 #include <random>
 #include <vector>
 
@@ -29,7 +29,7 @@ static void BM_Cancel_1k_Orders(benchmark::State& state) {
         std::vector<Order> orders;
         std::mt19937 rng(42);
         std::uniform_int_distribution<int> dist(0, 9999);
-        
+
         for (int i = 0; i < 10000; ++i) {
             Order order(i, Side::Buy, 100.0 + (i % 10), 10);
             orders.push_back(order);
@@ -65,7 +65,7 @@ static void BM_Modify_1k_Orders(benchmark::State& state) {
             orders.push_back(order);
             book.add_order(order);
         }
-        
+
         std::vector<int> indices_to_modify;
         indices_to_modify.reserve(1000);
         for (int i = 0; i < 1000; ++i) {
