@@ -17,6 +17,23 @@ const io = socketIo(server, {
 
 const LOG_ENGINE_STDERR = process.env.LOG_ENGINE_STDERR === '1';
 const MAX_LOG_LINE = 512;
+const BUILD_COMMIT =
+  process.env.APP_COMMIT_SHA ||
+  process.env.SOURCE_COMMIT ||
+  process.env.RAILWAY_GIT_COMMIT_SHA ||
+  process.env.RENDER_GIT_COMMIT ||
+  process.env.GITHUB_SHA ||
+  process.env.VERCEL_GIT_COMMIT_SHA ||
+  'unknown';
+const BUILD_TIME =
+  process.env.APP_BUILD_TIME || process.env.BUILD_TIME || process.env.RAILWAY_DEPLOYMENT_CREATED_AT || 'unknown';
+const BUILD_INFO = {
+  version: '1.0.0',
+  commit: BUILD_COMMIT,
+  shortCommit: BUILD_COMMIT === 'unknown' ? 'unknown' : BUILD_COMMIT.slice(0, 12),
+  buildTime: BUILD_TIME,
+  nodeEnv: process.env.NODE_ENV || 'development'
+};
 
 function readPositiveNumber(name, fallback) {
   const parsed = Number(process.env[name]);
@@ -65,6 +82,10 @@ function sameSnapshotDepth(left, right) {
 }
 
 app.use(cors());
+app.use((req, res, next) => {
+  res.setHeader('X-LFOB-Commit', BUILD_INFO.shortCommit);
+  next();
+});
 app.use(express.static('public'));
 
 app.get('/', (req, res) => {
@@ -91,8 +112,16 @@ app.get('/api/info', (req, res) => {
       languages: ['Rust', 'C++', 'JavaScript'],
       features: ['Real-time data', 'Lock-free architecture', 'Dual-engine telemetry'],
       symbol: simulator.currentSymbol,
-      description: 'Dual native matching engines streamed through a Socket.IO market gateway'
+      description: 'Dual native matching engines streamed through a Socket.IO market gateway',
+      build: BUILD_INFO
     }
+  });
+});
+
+app.get('/api/build', (req, res) => {
+  res.json({
+    success: true,
+    build: BUILD_INFO
   });
 });
 

@@ -75,10 +75,17 @@ The web dashboard is a dark, high-density terminal: one instrument strip, live d
 
 ## Deployment
 
-The provided `Dockerfile` is a multi-stage production image. It builds C++ on Debian Trixie with `g++`, CMake, Ninja, `-O3`, `-march=native`, and detected C++26 experimental standard flags; builds Rust in a separate Cargo stage; installs production-only Node.js dependencies; strips the native binaries; and copies only runtime artifacts into a `node:22-trixie-slim` final image.
+The provided `Dockerfile` is a multi-stage production image. It builds C++ on Debian Trixie with `g++`, CMake, Ninja, `-O3`, portable architecture defaults, and detected C++26 experimental standard flags where the compiler accepts them; builds Rust in a separate Cargo stage; installs production-only Node.js dependencies; strips the native binaries; and copies only runtime artifacts into a `node:22-trixie-slim` final image. Local benchmark builds can opt into host-specific code generation with `-DLFOB_ENABLE_NATIVE_ARCH=ON`.
+
+Production URL: `https://lock-free-order-book.onrender.com`
+
+The deployed service exposes `GET /api/build` and an `X-LFOB-Commit` response header so release audits can compare the served commit against GitHub.
 
 ```bash
-DOCKER_BUILDKIT=1 docker build -t lock-free-order-book .
+DOCKER_BUILDKIT=1 docker build \
+  --build-arg SOURCE_COMMIT="$(git rev-parse HEAD)" \
+  --build-arg BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  -t lock-free-order-book .
 docker run --rm -p 3000:3000 -e PORT=3000 lock-free-order-book
 ```
 
@@ -89,6 +96,8 @@ Runtime environment variables:
 | `PORT`                      | `3000`                                               | HTTP and Socket.IO listener port, compatible with Render/Railway port injection. |
 | `STREAM_INTERVAL_MS`        | `8`                                                  | Target market-data emission interval.                                            |
 | `ENGINE_COMMAND_TIMEOUT_MS` | `5000`                                               | Native engine batch/snapshot response timeout.                                   |
+| `APP_COMMIT_SHA`            | `unknown`                                            | Optional served commit identifier for `/api/build` and `X-LFOB-Commit`.          |
+| `APP_BUILD_TIME`            | `unknown`                                            | Optional UTC build timestamp for deployment audits.                              |
 | `CPP_ENGINE_PATH`           | `/app/cpp/build/order_book_cpp` in Docker            | C++ engine executable path.                                                      |
 | `RUST_ENGINE_PATH`          | `/app/rust/target/release/order_book_rust` in Docker | Rust engine executable path.                                                     |
 | `LOG_ENGINE_STDERR`         | unset                                                | Set to `1` only when native stderr diagnostics are needed.                       |

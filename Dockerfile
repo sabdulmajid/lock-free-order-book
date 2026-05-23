@@ -3,6 +3,8 @@
 ARG DEBIAN_RELEASE=trixie
 ARG NODE_VERSION=22
 ARG RUST_IMAGE=rust:1-slim-bookworm
+ARG SOURCE_COMMIT=unknown
+ARG BUILD_TIME=unknown
 
 FROM debian:${DEBIAN_RELEASE}-slim AS cpp-build
 ENV DEBIAN_FRONTEND=noninteractive
@@ -25,6 +27,7 @@ RUN --mount=type=cache,target=/src/cpp/build \
       -DCMAKE_BUILD_TYPE=Release \
       -DLFOB_BUILD_BENCHMARKS=OFF \
       -DLFOB_BUILD_TESTS=OFF \
+      -DLFOB_ENABLE_NATIVE_ARCH=OFF \
     && cmake --build cpp/build --target order_book_cpp \
     && install -D cpp/build/order_book_cpp /out/cpp/build/order_book_cpp \
     && strip /out/cpp/build/order_book_cpp
@@ -62,9 +65,14 @@ RUN --mount=type=cache,target=/root/.npm \
     npm ci --omit=dev --no-audit --no-fund
 
 FROM node:${NODE_VERSION}-${DEBIAN_RELEASE}-slim AS runtime
+ARG SOURCE_COMMIT=unknown
+ARG BUILD_TIME=unknown
+
 ENV NODE_ENV=production \
     PORT=3000 \
     STREAM_INTERVAL_MS=8 \
+    APP_COMMIT_SHA=${SOURCE_COMMIT} \
+    APP_BUILD_TIME=${BUILD_TIME} \
     CPP_ENGINE_PATH=/app/cpp/build/order_book_cpp \
     RUST_ENGINE_PATH=/app/rust/target/release/order_book_rust
 

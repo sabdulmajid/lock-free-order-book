@@ -41,6 +41,8 @@ Open `http://localhost:3000`.
 
 The container entrypoint runs `node server.js` directly and reads the listener port from `PORT`, with `3000` only as a local fallback. Native engine paths are configurable through `CPP_ENGINE_PATH` and `RUST_ENGINE_PATH`; the production image sets them to the stripped binaries copied from the C++ and Rust build stages. `STREAM_INTERVAL_MS` defaults to `8`, `ENGINE_COMMAND_TIMEOUT_MS` defaults to `5000`, and native stderr is suppressed unless `LOG_ENGINE_STDERR=1` is explicitly set.
 
+Release audits can verify freshness through `GET /api/build` or the `X-LFOB-Commit` response header. The server reads `APP_COMMIT_SHA`, `SOURCE_COMMIT`, `RAILWAY_GIT_COMMIT_SHA`, `RENDER_GIT_COMMIT`, `GITHUB_SHA`, or `VERCEL_GIT_COMMIT_SHA`, in that order, and falls back to `unknown` when the host does not provide a commit identifier.
+
 ## Socket Events
 
 Client to server:
@@ -56,6 +58,13 @@ Server to client:
 | `orderbook-snapshot` | Full book, metrics, trades, stock metadata | Initial state after connect or symbol switch.       |
 | `orderbook-update`   | Full top-of-book state and metrics         | Streaming update from the simulator/native engines. |
 | `new-trades`         | Recent trade array                         | Tape updates derived from simulated executions.     |
+
+HTTP audit endpoints:
+
+| Endpoint     | Purpose                                                        |
+| ------------ | -------------------------------------------------------------- |
+| `/api/build` | Returns version, commit, short commit, build time, and env.    |
+| `/api/info`  | Returns system metadata and embeds the same build information. |
 
 ## Rendering Constraints
 

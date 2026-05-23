@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: lock-free-order-book
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/build
+    autoDeploy: true
+    maxShutdownDelaySeconds: 30
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: STREAM_INTERVAL_MS
+        value: '8'
+      - key: ENGINE_COMMAND_TIMEOUT_MS
+        value: '5000'
+      - key: LOG_ENGINE_STDERR
+        value: '0'
